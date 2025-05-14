@@ -96,13 +96,14 @@ namespace {
 namespace {
 struct CreateWeightBins : public CreateWeightBinsBase<CreateWeightBins> {
   CreateWeightBins() = default;
-  CreateWeightBins(bool argKeepWeights){
+  CreateWeightBins(bool argKeepWeights, std::string argTopFuncName) {
     keepWeights = argKeepWeights;
+    topFuncName = argTopFuncName;
   }
   void runOnOperation() override {
     auto module = getOperation();
     auto context = module.getContext();
-    auto func = module.lookupSymbol<func::FuncOp>("forward");
+    auto func = module.lookupSymbol<func::FuncOp>(topFuncName);
     mlir::RewritePatternSet patterns(context);
     patterns.add<ConvertWeightsToBins>(context, keepWeights);
     (void)applyPatternsAndFoldGreedily(func, std::move(patterns));
@@ -110,6 +111,9 @@ struct CreateWeightBins : public CreateWeightBinsBase<CreateWeightBins> {
 };
 } // end anonymous namespace
 
-std::unique_ptr<Pass> streamhls::createCreateWeightBinsPass(bool keepWeights) {
-  return std::make_unique<CreateWeightBins>(keepWeights);
+std::unique_ptr<Pass> streamhls::createCreateWeightBinsPass(bool keepWeights, std::string topFuncName) {
+  return std::make_unique<CreateWeightBins>(
+    keepWeights,
+    topFuncName
+  );
 }

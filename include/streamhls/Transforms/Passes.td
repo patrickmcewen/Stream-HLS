@@ -202,7 +202,9 @@ def CreateWeightBins : Pass<"streamhls-create-weight-bins", "ModuleOp"> {
 
   let options = [
     Option<"keepWeights", "keep-weights", "bool",
-           /*default=*/"true", "wether to keep a DNN weights">
+           /*default=*/"true", "wether to keep a DNN weights">,
+    Option<"topFuncName", "top-func-name", "std::string",
+           /*default=*/"\"forward\"", "name of the top function">,
   ];
   let dependentDialects = ["mlir::streamhls::dataflow::DataflowDialect"];
 

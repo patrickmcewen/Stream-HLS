@@ -42,12 +42,19 @@ static llvm::cl::opt<std::string> weightsPath(
   llvm::cl::value_desc("path"),
   llvm::cl::init(".")
 );
+static llvm::cl::opt<std::string> topFuncName(
+  "vitis-hls-top-func",
+  llvm::cl::desc("Top function name"),
+  llvm::cl::value_desc("name"),
+  llvm::cl::init("forward")
+);
 static llvm::cl::opt<bool> isHost(
   "vitis-hls-is-host",
   llvm::cl::desc("Mark true if the target is host"),
   llvm::cl::value_desc("bool"),
   llvm::cl::init(false)
 );
+
 
 
 //===----------------------------------------------------------------------===//
@@ -2368,7 +2375,7 @@ void ModuleEmitter::emitFunction(func::FuncOp func) {
 
   // Emit function body.
   addIndent();
-  if(func.getName() == "forward"){
+  if(func.getName() == topFuncName){
     os << "\t#pragma HLS DATAFLOW\n";
   }
     

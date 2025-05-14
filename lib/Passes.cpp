@@ -85,7 +85,7 @@ void streamhls::registerStreamHLSKernelPipeline() {
         // pm.addPass(mlir::createCanonicalizerPass());
 
         pm.addPass(streamhls::createRemoveRedundantOpsPass());
-        pm.addPass(streamhls::createCreateWeightBinsPass(false));
+        pm.addPass(streamhls::createCreateWeightBinsPass(false, opts.hlsTopFunc));
         pm.addPass(mlir::createCanonicalizerPass());
         if (opts.debugPoint == 1)
           return;
@@ -275,7 +275,7 @@ void streamhls::registerStreamHLSBaseKernelPipeline() {
       [](OpPassManager &pm, const StreamHLSBaseKernelPipelineOptions &opts) {
 
         pm.addPass(streamhls::createRemoveRedundantOpsPass());
-        pm.addPass(streamhls::createCreateWeightBinsPass(false));
+        pm.addPass(streamhls::createCreateWeightBinsPass(false, opts.hlsTopFunc));
         pm.addPass(mlir::createCanonicalizerPass());
         if (opts.debugPoint == 1)
           return;
@@ -325,9 +325,9 @@ void streamhls::registerStreamHLSBaseKernelPipeline() {
 namespace {
 struct StreamHLSHostPipelineOptions
     : public PassPipelineOptions<StreamHLSHostPipelineOptions> {
-  // Option<std::string> hlsTopFunc{
-  //     *this, "top-func", llvm::cl::init("forward"),
-  //     llvm::cl::desc("Specify the top function of the design")};
+  Option<std::string> hlsTopFunc{
+      *this, "top-func", llvm::cl::init("forward"),
+      llvm::cl::desc("Specify the top function of the design")};
   // Option<unsigned> debugPoint{
   //     *this, "debug-point", llvm::cl::init(0),
   //     llvm::cl::desc("Stop the pipeline at the given debug point")};
@@ -341,7 +341,7 @@ void streamhls::registerStreamHLSHostPipeline() {
       [](OpPassManager &pm, const StreamHLSHostPipelineOptions &opts) {
 
         pm.addPass(streamhls::createRemoveRedundantOpsPass());
-        pm.addPass(streamhls::createCreateWeightBinsPass(true));
+        pm.addPass(streamhls::createCreateWeightBinsPass(true, opts.hlsTopFunc));
         pm.addPass(mlir::createCanonicalizerPass());
 
         pm.addPass(func::createFuncBufferizePass());

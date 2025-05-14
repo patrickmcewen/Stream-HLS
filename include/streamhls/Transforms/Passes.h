@@ -85,7 +85,10 @@ std::unique_ptr<Pass> createCombinedOptimizationPass(
 std::unique_ptr<Pass> createMinimalBufferSizesPass();
 std::unique_ptr<Pass> createPrintIRPass(std::string filePath = "dnn.mlir");
 
-std::unique_ptr<Pass> createCreateWeightBinsPass(bool keepWeights = true);
+std::unique_ptr<Pass> createCreateWeightBinsPass(
+  bool keepWeights = true,
+  std::string topFuncName = "forward"
+);
 std::unique_ptr<Pass> createCreateHostPass();
 
 // ScaleHLS
