@@ -2339,19 +2339,27 @@ static void tilingFactorConstraints(std::stringstream& perfModel, DFG& dfg){
 static void DSPsConstraints(std::stringstream& perfModel, DFG& dfg, unsigned DSPs){
   // 2: all DSPs
   std::stringstream totalDSP;
+  bool has_dsps = false;
   for(auto nodePair : llvm::enumerate(dfg.nodes)){
     auto idx = nodePair.index();
     auto id = nodePair.value().first;
     if (id == 10000)
       continue;
     totalDSP << "DSP_" << id;
+    has_dsps = true;
     if(idx != dfg.nodes.size()-1){
       totalDSP << " + ";
     }
   }
-  addVariable(perfModel, "totalDSPs", "integer");
-  addConstraint(perfModel, "totalDSPDef", "totalDSPs" , totalDSP.str(), "==");
-  addConstraint(perfModel, "totalDSPConst", "totalDSPs", std::to_string(DSPs), "<=");
+
+  if(!has_dsps){
+    addVariable(perfModel, "totalDSPs", "integer");
+    addConstraint(perfModel, "totalDSPDef", "totalDSPs" , "0", "==");
+  }else{
+    addVariable(perfModel, "totalDSPs", "integer");
+    addConstraint(perfModel, "totalDSPDef", "totalDSPs" , totalDSP.str(), "==");
+    addConstraint(perfModel, "totalDSPConst", "totalDSPs", std::to_string(DSPs), "<=");
+  }
 }
 
 static void displayPermutationVariables(std::stringstream& perfModel, DFG& dfg){
