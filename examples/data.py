@@ -104,6 +104,24 @@ model_configs = {
       "input" : (
         randTensor(8, 1024, dtype=dtype),
       )
+    },
+    "Decoder" : {
+      "class": "Decoder",
+      "config" : dict(
+        input_size=1024
+      ),
+      "input" : (
+        randTensor(1, 1024, dtype=dtype),
+      )
+    },
+    "DenseDecoder" : {
+      "class": "DenseDecoder",
+      "config" : dict(
+        input_size=474
+      ),
+      "input" : (
+        randTensor(2, 474, dtype=dtype),
+      )
     }
   },
   # cnn

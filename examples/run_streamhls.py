@@ -13,7 +13,7 @@ args = parser.parse_args()
 
 tilelimit=10
 timelimit=20
-dsps=2560
+dsps=2560*3
 # bufferize function arguments flag
 bufferize=0
 # minimize_on_chip_buffers function arguments flag
@@ -46,7 +46,7 @@ elif opt == 1:
   combOpt=0
 
 
-outDir=f'designs/{benchmark}/opt{opt}/{kernel}'
+outDir=f'designs/{benchmark}/opt{opt}/{kernel}_{dsps}'
 
 cmd = f'python streamhls_pipeline.py \
   --prjsdir={outDir} \
