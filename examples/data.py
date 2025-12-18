@@ -170,6 +170,80 @@ model_configs = {
       "input" : (
         randTensor(1, 64, 128, dtype=dtype),
       )
+    },
+    "bit_llama" : {
+      "class": "bit_llama",
+      "config" : {},
+      "input" : (
+        torch.randint(0, 20000, (1, 512), dtype=torch.long),
+      )
+    },
+    "bit_transformer" : {
+      "class": "bit_transformer",
+      "config" : dict(
+        dim=128,
+        depth=6,
+        num_tokens=20000,
+        heads=8,
+        ff_mult=4
+      ),
+      "input" : (
+        # Provide embedded tensors directly (batch, seq_len, dim) instead of token indices
+        # to avoid unsupported MLIR operations (embedding lookup done on host side)
+        randTensor(1, 512, 128, dtype=dtype),
+      )
+    }
+  },
+  "test_bitnet" : {
+    "BitLinear" : {
+      "class": "BitLinear",
+      "config" : dict(
+        in_features=128,
+        out_features=128
+      ),
+      "input" : (
+        randTensor(1, 128, 128, dtype=dtype),
+      )
+    },
+    "SimpleRMSNorm" : {
+      "class": "SimpleRMSNorm",
+      "config" : dict(
+        dim=128
+      ),
+      "input" : (
+        randTensor(1, 128, 128, dtype=dtype),
+      )
+    },
+    "BitFeedForward" : {
+      "class": "BitFeedForward",
+      "config" : dict(
+        dim=128
+      ),
+      "input" : (
+        randTensor(1, 128, 128, dtype=dtype),
+      )
+    },
+    "BitMGQA" : {
+      "class": "BitMGQA",
+      "config" : dict(
+        embed_dim=128,
+      ),
+      "input" : (
+        randTensor(1, 512, 128, dtype=dtype),
+        randTensor(1, 512, 128, dtype=dtype),
+        randTensor(1, 512, 128, dtype=dtype),
+      )
+    },
+    "BitNetTransformer" : {
+      "class": "BitNetTransformer",
+      "config" : dict(
+        dim=128,
+        depth=6,
+        num_tokens=20000,
+      ),
+      "input" : (
+        torch.randint(0, 20000, (1, 1024)),
+      )
     }
   },
   # synthetic

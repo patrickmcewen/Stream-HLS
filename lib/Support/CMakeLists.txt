@@ -7,6 +7,11 @@ file(GLOB globbed *.cpp)
 add_mlir_library(MLIR_StreamHLS_Support
   ${globbed}
   
+  DEPENDS
+  MLIRDataflowIncGen
+  MLIRDataflowAttributesIncGen
+  MLIRDataflowInterfacesIncGen
+  
   LINK_LIBS PUBLIC
   MLIRAffineUtils
   MLIRIR

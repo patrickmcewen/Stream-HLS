@@ -77,6 +77,10 @@ if __name__ == "__main__":
         print(f"Model '{model}' successfully imported and initialized.")
       
       except Exception as e:
+        import traceback
         print(f"Error importing or initializing model '{model}': {e}")
+        print(f"Exception type: {type(e).__name__}")
+        print("Full traceback:")
+        traceback.print_exc()
 
 
