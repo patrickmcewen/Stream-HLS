@@ -1,4 +1,7 @@
-#!/usr/bin/env bash
+#!/bin/bash
+
+source ../codesign/miniconda3/etc/profile.d/conda.sh
+conda activate streamhls
 
 # If ninja is available, use it.
 CMAKE_GENERATOR="Unix Makefiles"
@@ -9,7 +12,7 @@ fi
 mkdir -p build
 cd build
 
-LLVM_PRJ_PATH=$1
+LLVM_PRJ_PATH=/scratch/patrick/Stream-HLS/extern/llvm-project
 
 # Check if the LLVM and MLIR paths are set.
 if [ -z "${LLVM_PRJ_PATH}" ]; then
@@ -39,3 +42,18 @@ if [ "${CMAKE_GENERATOR}" == "Ninja" ]; then
 else
   make
 fi
+
+# Export PATH and source Xilinx tools
+# Note: These exports will only work if script is sourced, not executed
+export PATH=$PATH:/scratch/patrick/Stream-HLS/build/bin
+export PATH=$PATH:/scratch/patrick/Stream-HLS/ampl.linux-intel64
+# Set LD_LIBRARY_PATH for Gurobi solver
+export LD_LIBRARY_PATH=/scratch/patrick/Stream-HLS/ampl.linux-intel64:$LD_LIBRARY_PATH
+
+# Source Xilinx HLS settings if available
+if [ -f /afs/ece.cmu.edu/support/xilinx/xilinx.release/Vivado-2022.1/Vitis_HLS/2022.1/settings64.sh ]; then
+    source /afs/ece.cmu.edu/support/xilinx/xilinx.release/Vivado-2022.1/Vitis_HLS/2022.1/settings64.sh
+fi
+
+# Return to original directory (important when sourcing)
+cd /scratch/patrick/Stream-HLS
