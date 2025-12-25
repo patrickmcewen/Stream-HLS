@@ -45,6 +45,16 @@ model_configs = {
       "class": "k3mm",
       "config" : {},
       "input" : (
+        randTensor(180, 180, dtype=dtype),
+        randTensor(180, 180, dtype=dtype),
+        randTensor(180, 180, dtype=dtype),
+        randTensor(180, 180, dtype=dtype)
+      )
+    },
+    "k3mm_call" : {
+      "class": "k3mm_call",
+      "config" : {},
+      "input" : (
         randTensor(180, 200, dtype=dtype),
         randTensor(200, 190, dtype=dtype),
         randTensor(190, 220, dtype=dtype),
@@ -226,12 +236,14 @@ model_configs = {
     "BitMGQA" : {
       "class": "BitMGQA",
       "config" : dict(
-        embed_dim=128,
+        embed_dim=8,
+        query_heads=1,
+        kv_heads=1
       ),
       "input" : (
-        randTensor(1, 512, 128, dtype=dtype),
-        randTensor(1, 512, 128, dtype=dtype),
-        randTensor(1, 512, 128, dtype=dtype),
+        randTensor(1, 512, 8, dtype=dtype),
+        randTensor(1, 512, 8, dtype=dtype),
+        randTensor(1, 512, 8, dtype=dtype),
       )
     },
     "BitNetTransformer" : {
@@ -243,6 +255,38 @@ model_configs = {
       ),
       "input" : (
         torch.randint(0, 20000, (1, 1024)),
+      )
+    }
+  },
+  "test_llama" : {
+    "RMSNorm" : {
+      "class": "RMSNorm",
+      "config" : dict(
+        dim=128,
+        norm_eps=1e-5
+      ),
+      "input" : (
+        randTensor(1, 128, 128, dtype=dtype),
+      )
+    },
+    "FeedForward" : {
+      "class": "FeedForward",
+      "config" : dict(
+      ),
+      "input" : (
+        randTensor(1, 14336, 4096, dtype=dtype),
+      )
+    },
+    "Attention" : {
+      "class": "Attention",
+      "config" : dict(
+      ),
+      "input" : (
+        randTensor(2, 8, 4096, dtype=dtype),
+        randTensor(8, 64, dtype=dtype),
+        randTensor(8, 8, dtype=dtype),
+        randTensor(4, 128, 8, 128, dtype=dtype),
+        randTensor(4, 128, 8, 128, dtype=dtype),
       )
     }
   },
