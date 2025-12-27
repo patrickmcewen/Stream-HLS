@@ -181,6 +181,18 @@ model_configs = {
         randTensor(1, 64, 128, dtype=dtype),
       )
     },
+    "MultiHeadSelfAttentionKV" : {
+      "class": "MultiHeadSelfAttentionKV",
+      "config" : dict(
+        embed_dim=128,
+        num_heads=8
+      ),
+      "input" : (
+        randTensor(1, 1, 128, dtype=dtype),  # x: single new token
+        randTensor(1, 1024, 8, 16, dtype=dtype),  # k_cache: cached keys (batch, cached_len, num_heads, head_dim)
+        randTensor(1, 1024, 8, 16, dtype=dtype),  # v_cache: cached values (batch, cached_len, num_heads, head_dim)
+      )
+    },
     "bit_llama" : {
       "class": "bit_llama",
       "config" : {},
@@ -200,6 +212,51 @@ model_configs = {
       "input" : (
         # Provide embedded tensors directly (batch, seq_len, dim) instead of token indices
         # to avoid unsupported MLIR operations (embedding lookup done on host side)
+        randTensor(1, 512, 128, dtype=dtype),
+      )
+    }
+  },
+  "LLM" : {
+    "Transformer" : {
+      "class": "Transformer",
+      "config" : dict(
+        embed_dim=128,
+        num_heads=8,
+        num_layers=6,
+        num_tokens=20000,
+        ff_dim=256
+      ),
+      "input" : (
+        torch.randint(0, 20000, (1, 512), dtype=torch.long),
+      )
+    },
+    "TransformerKV" : {
+      "class": "TransformerKV",
+      "config" : dict(
+        embed_dim=128,
+        num_heads=4,
+        num_layers=1,
+        num_tokens=20000,
+        ff_dim=256
+      ),
+      "input" : (
+        #torch.randint(0, 20000, (1, 1), dtype=torch.long),
+        randTensor(1, 1, 128, dtype=dtype), 
+        randTensor(1, 1024, 4, 32, dtype=dtype),
+        randTensor(1, 1024, 4, 32, dtype=dtype),
+      )
+    },
+    "Inference" : {
+      "class": "Inference",
+      "config" : dict(
+        embed_dim=128,
+        num_heads=4,
+        num_layers=1,
+        num_tokens=20000,
+        ff_dim=256
+      ),
+      "input" : (
+        #torch.randint(0, 20000, (1, 512), dtype=torch.long),
         randTensor(1, 512, 128, dtype=dtype),
       )
     }
@@ -249,12 +306,20 @@ model_configs = {
     "BitNetTransformer" : {
       "class": "BitNetTransformer",
       "config" : dict(
-        dim=128,
-        depth=6,
+        dim=32,
+        depth=1,
         num_tokens=20000,
       ),
       "input" : (
         torch.randint(0, 20000, (1, 1024)),
+      )
+    },
+    "BitNetInference" : {
+      "class": "BitNetInference",
+      "config" : {},
+      "input" : (
+        #torch.randint(0, 20000, (1, 1024)),
+        randTensor(1, 1024, 32, dtype=dtype),
       )
     }
   },
