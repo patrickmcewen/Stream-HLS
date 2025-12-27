@@ -2,6 +2,46 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# Export functions to prevent dead code elimination
+__all__ = [
+    'addf', 'mulf', 'subf', 'divf', 'exp_bb',
+    'addf_ctrl_chain', 'mulf_ctrl_chain', 'subf_ctrl_chain', 
+    'divf_ctrl_chain', 'exp_bb_ctrl_chain',
+    'MultiHeadSelfAttention'
+]
+
+def addf(a: float, b: float) -> float:
+    return a + b
+
+def mulf(a: float, b: float) -> float:
+    return a * b
+
+def subf(a: float, b: float) -> float:
+    return a - b
+
+def divf(a: float, b: float) -> float:
+    return a / b
+
+def exp_bb(a: float) -> float:
+    # Putting exp(a) here causes an unsupported instruction to be generated. This is just a placeholder anyways.
+    return a * 2
+
+def addf_ctrl_chain(a: float, b: float) -> float:
+    return a + b
+
+def mulf_ctrl_chain(a: float, b: float) -> float:
+    return a * b
+
+def subf_ctrl_chain(a: float, b: float) -> float:
+    return a - b
+
+def divf_ctrl_chain(a: float, b: float) -> float:
+    return a / b
+
+def exp_bb_ctrl_chain(a: float) -> float:
+    # Putting exp(a) here causes an unsupported instruction to be generated. This is just a placeholder anyways.
+    return a * 2
+
 class MultiHeadSelfAttention(nn.Module):
     def __init__(self, embed_dim, num_heads):
         super(MultiHeadSelfAttention, self).__init__()

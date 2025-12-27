@@ -24,6 +24,8 @@
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 
+#include "llvm/ADT/StringRef.h"
+
 #include "streamhls/Dialect/Dataflow/Dataflow.h"
 #include "streamhls/Support/AffineMemAccess.h"
 
@@ -67,6 +69,13 @@ bool setIntAttr(SmallVector<AffineForOp, 6> &forOps,
                 const SmallVector<int, 6> &attr_arr, std::string attr_name);
 
 std::vector<std::string> split_names(const std::string &arg_names);
+
+//===----------------------------------------------------------------------===//
+// Blackbox function utilities
+//===----------------------------------------------------------------------===//
+
+/// Check if a function name corresponds to a blackbox function
+bool isBlackboxFunctionName(llvm::StringRef funcName);
 
 //===----------------------------------------------------------------------===//
 // Memory and loop analysis utils

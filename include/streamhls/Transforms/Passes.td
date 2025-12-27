@@ -229,6 +229,18 @@ def StencilDataReuse :
   let dependentDialects = ["mlir::streamhls::dataflow::DataflowDialect"];
 }
 
+def OperationBlackbox : Pass<"streamhls-operation-blackbox", "ModuleOp"> {
+  let summary = "Replace arithmetic operations with blackbox function calls";
+  let constructor = "mlir::streamhls::createOperationBlackboxPass()";
+  let dependentDialects = [
+    "mlir::streamhls::dataflow::DataflowDialect",
+    "mlir::func::FuncDialect",
+    "mlir::arith::ArithDialect",
+    "mlir::affine::AffineDialect",
+    "mlir::math::MathDialect"
+  ];
+}
+
 // ScaleHLS
 def LowerCopyToAffine : Pass<"scalehls-lower-copy-to-affine", "func::FuncOp"> {
   let summary = "Convert copy and assign to affine loops";

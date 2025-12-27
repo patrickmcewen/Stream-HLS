@@ -1473,3 +1473,13 @@ bool streamhls::isElementwiseGenericOp(linalg::GenericOp op) {
   }
   return true;
 }
+
+//===----------------------------------------------------------------------===//
+// Blackbox function utilities
+//===----------------------------------------------------------------------===//
+
+bool streamhls::isBlackboxFunctionName(llvm::StringRef funcName) {
+    return funcName == "addf" || funcName == "subf" || funcName == "mulf" ||
+           funcName == "divf" || funcName == "exp_bb" || funcName == "addf_ctrl_chain" ||
+           funcName == "mulf_ctrl_chain" || funcName == "subf_ctrl_chain" || funcName == "divf_ctrl_chain" || funcName == "exp_bb_ctrl_chain";
+}

@@ -1778,8 +1778,20 @@ void ModuleEmitter::emitCall(func::CallOp op) {
   }
 
   // Emit the function call.
-  indent();
-  os << op.getCallee() << "(";
+  if (isBlackboxFunctionName(op.getCallee())) {
+    indent();
+    os << "// This is a blackbox function call.\n";
+    auto results = op.getResults();
+    for (auto result : results) {
+      indent();
+      emitValue(result);
+      os << " = " << op.getCallee() << "(";
+      break;
+    }
+  } else {
+    indent();
+    os << op.getCallee() << "(";
+  }
 
   // Handle input arguments.
   unsigned argIdx = 0;
@@ -1790,15 +1802,17 @@ void ModuleEmitter::emitCall(func::CallOp op) {
       os << ", ";
   }
 
-  // Handle output arguments.
-  for (auto result : op.getResults()) {
-    // The address should be passed in for scalar result arguments.
-    if (result.getType().isa<ShapedType>())
-      os << ", ";
-    else
-      os << ", &";
+  // Handle output arguments as a function arg if not blackbox
+  if (!isBlackboxFunctionName(op.getCallee())) {
+    for (auto result : op.getResults()) {
+      // The address should be passed in for scalar result arguments.
+      if (result.getType().isa<ShapedType>())
+        os << ", ";
+      else
+        os << ", &";
 
-    emitValue(result);
+      emitValue(result);
+    }
   }
 
   os << ");";
@@ -2275,6 +2289,63 @@ void ModuleEmitter::emitFunction(func::FuncOp func) {
   std::cout << "PRJ_PATH: " << prj_path_str << std::endl;
 )XXX";
     os << envVar;
+  } else if (isBlackboxFunctionName(func.getName())) {
+    // Emit function signature for blackbox functions.
+    indent();
+    os << "// This is a blackbox function.\n";
+    auto funcReturn = cast<func::ReturnOp>(func.front().getTerminator());
+    auto results = funcReturn.getOperands();
+    for (auto result : results) {
+      os << getTypeName(result.getType()) << " " << func.getName() << "(\n";
+      addIndent();
+      break;
+    }
+    // Emit input arguments for blackbox functions.
+    unsigned argIdx = 0;
+    std::vector<std::string> input_args;
+    if (func->hasAttr("inputs")) {
+      std::string input_names =
+          func->getAttr("inputs").cast<StringAttr>().getValue().str();
+      input_args = split_names(input_names);
+    }
+    std::string itypes = "";
+    if (func->hasAttr("itypes"))
+      itypes = func->getAttr("itypes").cast<StringAttr>().getValue().str();
+    else {
+      for (unsigned i = 0; i < func.getNumArguments(); ++i)
+        itypes += "x";
+    }
+    for (auto &arg : func.getArguments()) {
+      indent();
+      fixUnsignedType(arg, itypes[argIdx] == 'u');
+      if (arg.getType().isa<ShapedType>()) {
+        if (input_args.size() == 0) {
+          emitArrayDecl(arg, true);
+        } else {
+          emitArrayDecl(arg, true, input_args[argIdx]);
+        }
+      } else if(arg.getType().isa<StreamType>()){
+        if (input_args.size() == 0) {
+          emitValue(arg, 0, false, "", true);
+        } else {
+          emitValue(arg, 0, false, input_args[argIdx], true);
+        }
+      } else {
+        if (input_args.size() == 0) {
+          emitValue(arg);
+        } else {
+          emitValue(arg, 0, false, input_args[argIdx]);
+        }
+      }
+
+      portList.push_back(arg);
+      if (argIdx++ != func.getNumArguments() - 1)
+        os << ",\n";
+      else
+        os << "\n";
+    }
+    reduceIndent();
+    os << ") {";
   } else {
     os << "void " << func.getName() << "(\n";
     addIndent();
@@ -2327,45 +2398,47 @@ void ModuleEmitter::emitFunction(func::FuncOp func) {
         os << ",\n";
     }
 
-    // Emit results.
-    auto args = func.getArguments();
-    std::string otypes = "";
-    if (func->hasAttr("otypes"))
-      otypes = func->getAttr("otypes").cast<StringAttr>().getValue().str();
-    else {
-      for (unsigned i = 0; i < func.getNumArguments(); ++i)
-        otypes += "x";
-    }
-    if (auto funcReturn =
-            dyn_cast<func::ReturnOp>(func.front().getTerminator())) {
-      unsigned idx = 0;
-      for (auto result : funcReturn.getOperands()) {
-        if (std::find(args.begin(), args.end(), result) == args.end()) {
-          os << ",\n";
-          indent();
-
-          // TODO: a known bug, cannot return a value twice, e.g. return %0, %0
-          // : index, index. However, typically this should not happen.
-          fixUnsignedType(result, otypes[idx] == 'u');
-          if (result.getType().isa<ShapedType>()) {
-            if (output_names != "")
-              emitArrayDecl(result, true);
-            else
-              emitArrayDecl(result, true, output_names);
-          } else {
-            // In Vivado HLS, pointer indicates the value is an output.
-            if (output_names != "")
-              emitValue(result, /*rank=*/0, /*isPtr=*/true);
-            else
-              emitValue(result, /*rank=*/0, /*isPtr=*/true, output_names);
-          }
-
-          portList.push_back(result);
-        }
-        idx += 1;
+    // Emit results as a function arg if not blackbox
+    if (!isBlackboxFunctionName(func.getName())) {
+      auto args = func.getArguments();
+      std::string otypes = "";
+      if (func->hasAttr("otypes"))
+        otypes = func->getAttr("otypes").cast<StringAttr>().getValue().str();
+      else {
+        for (unsigned i = 0; i < func.getNumArguments(); ++i)
+          otypes += "x";
       }
-    } else
-      emitError(func, "doesn't have a return operation as terminator.");
+      if (auto funcReturn =
+              dyn_cast<func::ReturnOp>(func.front().getTerminator())) {
+        unsigned idx = 0;
+        for (auto result : funcReturn.getOperands()) {
+          if (std::find(args.begin(), args.end(), result) == args.end()) {
+            os << ",\n";
+            indent();
+
+            // TODO: a known bug, cannot return a value twice, e.g. return %0, %0
+            // : index, index. However, typically this should not happen.
+            fixUnsignedType(result, otypes[idx] == 'u');
+            if (result.getType().isa<ShapedType>()) {
+              if (output_names != "")
+                emitArrayDecl(result, true);
+              else
+                emitArrayDecl(result, true, output_names);
+            } else {
+              // In Vivado HLS, pointer indicates the value is an output.
+              if (output_names != "")
+                emitValue(result, /*rank=*/0, /*isPtr=*/true);
+              else
+                emitValue(result, /*rank=*/0, /*isPtr=*/true, output_names);
+            }
+
+            portList.push_back(result);
+          }
+          idx += 1;
+        }
+      } else
+        emitError(func, "doesn't have a return operation as terminator.");
+    }
 
     reduceIndent();
 

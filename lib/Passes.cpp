@@ -83,6 +83,8 @@ void streamhls::registerStreamHLSKernelPipeline() {
         // Linalg fake quantization.
         // pm.addPass(streamhls::createLinalgFakeQuantizePass());
         // pm.addPass(mlir::createCanonicalizerPass());
+        if(opts.debugPoint == 0)
+          return;
 
         pm.addPass(streamhls::createRemoveRedundantOpsPass());
         pm.addPass(streamhls::createCreateWeightBinsPass(false, opts.hlsTopFunc));
@@ -252,6 +254,9 @@ void streamhls::registerStreamHLSKernelPipeline() {
 
         // pm.addPass(streamhls::createPipelineInnerLoopsPass());
         // pm.addPass(mlir::createCanonicalizerPass());
+
+        pm.addPass(streamhls::createOperationBlackboxPass());
+        pm.addPass(mlir::createCanonicalizerPass());
 
       });
 }

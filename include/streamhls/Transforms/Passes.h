@@ -91,6 +91,8 @@ std::unique_ptr<Pass> createCreateWeightBinsPass(
 );
 std::unique_ptr<Pass> createCreateHostPass();
 
+std::unique_ptr<Pass> createOperationBlackboxPass();
+
 // ScaleHLS
 std::unique_ptr<Pass> createLowerCopyToAffinePass(bool internalCopyOnly = true);
 std::unique_ptr<Pass> createCreateDataflowFromLinalgPass();
