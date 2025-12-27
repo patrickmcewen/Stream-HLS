@@ -385,5 +385,17 @@ model_configs = {
         randTensor(P, Q, dtype=dtype)
       )
     }
+  },
+  "codesign" : {
+    "MultiHeadSelfAttention" : {
+      "class": "MultiHeadSelfAttention",
+      "config" : dict(
+        embed_dim=128,
+        num_heads=8
+      ),
+      "input" : (
+        randTensor(1, 64, 128, dtype=dtype),
+      )
+    }
   }
 }

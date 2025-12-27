@@ -1,5 +1,7 @@
 import os
+import sys
 import importlib
+import importlib.util
 import argparse as ap
 from utils import convertTorchToMLIR, generateGoldenResults
 from data import model_configs
@@ -10,6 +12,7 @@ if __name__ == "__main__":
   # args
   parser = ap.ArgumentParser()
   parser.add_argument("--benchmark", '-b', type=str, default="all", help="Benchmark of kernel to generate")
+  parser.add_argument("--benchmark-path", type=str, default="", help="Path to the benchmark")
   parser.add_argument("--model", '-m', type=str, default="all", help="Model to generate")
   parser.add_argument("--model-folder", '-i', type=str, default="pymodels", help="Folder containing the model files")
   parser.add_argument("--output-path", '-o', type=str, default="./models", help="Path to save the generated models")
@@ -27,8 +30,8 @@ if __name__ == "__main__":
 
     output_path = f'{args.output_path}'
 
-    model_path = f"./{model_folder}/{benchmark}"
-    model_import_path = f"{model_folder}.{benchmark}"
+    model_path = f"{args.benchmark_path}"
+    model_import_path = f"{benchmark.replace('/', '.')}"
     model_files = [f for f in os.listdir(model_path) if f.endswith(".py")]
     # Remove the ".py" extension to get module names
     model_modules = [f[:-3] for f in model_files]
@@ -53,8 +56,28 @@ if __name__ == "__main__":
           # os.makedirs(f"{output_path}/{model}/tapa/src")
         print(f"Model: {model}")
         # Import the module dynamically
-        print(f"Importing: {model_folder}.{benchmark}.{model_configs[benchmark][model]['class']}")
-        module = importlib.import_module(f"{model_folder}.{benchmark}.{model_configs[benchmark][model]['class']}")
+        if args.benchmark_path:
+          # If benchmark_path is provided, try to load from file path
+          benchmark_path_abs = os.path.abspath(os.path.normpath(args.benchmark_path))
+          module_name = model_configs[benchmark][model]['class']
+          
+          # Try to find the Python file in different possible locations
+          module_file = os.path.join(benchmark_path_abs, f"{module_name}.py")
+          assert os.path.exists(module_file), f"Module file {module_file} does not exist"
+        
+
+          # Load module directly from file
+          spec = importlib.util.spec_from_file_location(module_name, module_file)
+          if spec is None or spec.loader is None:
+            raise ImportError(f"Could not load spec from {module_file}")
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          print(f"Loaded module from file: {module_file}")
+        else:
+          # Use the original model_folder approach
+          print(f"Importing: {model_folder}.{benchmark}.{model_configs[benchmark][model]['class']}")
+          module = importlib.import_module(f"{model_folder}.{benchmark}.{model_configs[benchmark][model]['class']}")
+        
         # Get the model class from the module
         model_class = getattr(module, model_configs[benchmark][model]['class'])
 

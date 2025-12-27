@@ -38,13 +38,14 @@ parser.add_argument('--compile_only', type=int, required=False, default=0)
 
 
 args = parser.parse_args()
+print("prjsdir: ", args.prjsdir)
 # prj_path=$(realpath $prjs_path/$model)
 prjs_dir = args.prjsdir
 model = args.model
 bench = args.bench
 prj_path = Path(prjs_dir) / model
 # get the absolute path
-prj_path = prj_path.resolve()
+#prj_path = prj_path.resolve()
 dsps = args.dsps
 tilelimit = args.tilelimit
 debug = args.debug
@@ -81,7 +82,9 @@ paralOpt = 'true' if paralOpt == 1 else 'false'
 
 # call torch mlir
 if (compile_only == 0):
-  cmd = f'python gen_mlir_designs.py -b {bench} -m {model} -o {prjs_dir}'
+  print(bench)
+  print(bench.split("/")[-1])
+  cmd = f'python gen_mlir_designs.py -b codesign -m {model} -o {prjs_dir} --benchmark-path {bench}'
   os.system(cmd)
 # exit(0)
 # set up logging
