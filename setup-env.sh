@@ -21,8 +21,8 @@ export PATH=$PATH:$ROOT_DIR/ampl.linux-intel64
 export LD_LIBRARY_PATH=$ROOT_DIR/ampl.linux-intel64:$LD_LIBRARY_PATH
 
 # Source Xilinx HLS settings if available
-if [ -f /afs/ece.cmu.edu/support/xilinx/xilinx.release/Vivado-2022.1/Vitis_HLS/2022.1/settings64.sh ]; then
-    source /afs/ece.cmu.edu/support/xilinx/xilinx.release/Vivado-2022.1/Vitis_HLS/2022.1/settings64.sh
+if [ -f /afs/ece.cmu.edu/support/xilinx/xilinx.release/Vivado-2023.2/Vitis_HLS/2023.2/settings64.sh ]; then
+    source /afs/ece.cmu.edu/support/xilinx/xilinx.release/Vivado-2023.2/Vitis_HLS/2023.2/settings64.sh
 fi
 
 echo "Stream-HLS environment setup complete!"
