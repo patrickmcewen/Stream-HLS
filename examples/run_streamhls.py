@@ -13,7 +13,7 @@ args = parser.parse_args()
 
 tilelimit=1
 timelimit=1
-dsps=188
+dsps=357
 # bufferize function arguments flag
 bufferize=0
 # minimize_on_chip_buffers function arguments flag
