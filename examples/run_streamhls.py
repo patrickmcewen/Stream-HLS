@@ -11,9 +11,9 @@ parser.add_argument('-c', '--compile_only', type=int, default=0, help='Compile o
 args = parser.parse_args()
 
 
-tilelimit=10
-timelimit=20
-dsps=2560*3
+tilelimit=1
+timelimit=1
+dsps=188
 # bufferize function arguments flag
 bufferize=0
 # minimize_on_chip_buffers function arguments flag
