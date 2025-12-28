@@ -1,4 +1,7 @@
-#!/usr/bin/env bash
+#!/bin/bash
+
+source ../miniconda3/etc/profile.d/conda.sh
+conda activate streamhls
 
 # If ninja is available, use it.
 CMAKE_GENERATOR="Unix Makefiles"
@@ -6,45 +9,12 @@ if which ninja &>/dev/null; then
   CMAKE_GENERATOR="Ninja"
 fi
 
-echo "Building LLVM..."
+ROOT_DIR="$(pwd)"
 
-# The absolute path to the directory of this script.
-ROOT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-
-# Got to the build directory.
-cd "${ROOT_DIR}"
-mkdir -p extern/llvm-project/build
-cd extern/llvm-project/build
-
-# Configure CMake.
-if [ ! -f "CMakeCache.txt" ]; then
-  cmake -G "${CMAKE_GENERATOR}" \
-    ../llvm \
-    -DLLVM_ENABLE_PROJECTS=mlir \
-    -DCMAKE_BUILD_TYPE=Debug \
-    -DLLVM_ENABLE_ASSERTIONS=ON \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_CXX_COMPILER=clang++ \
-    -DLLVM_ENABLE_LLD=ON
-cmake --build . --target check-mlir
-fi
-
-# Run building.
-if [ "${CMAKE_GENERATOR}" == "Ninja" ]; then
-  ninja
-else 
-  make -j "$(nproc)"
-fi
-echo "LLVM built successfully."
-
-source setup-env.sh
-
-echo "Building Stream-HLS..."
-cd "${ROOT_DIR}"
 mkdir -p build
 cd build
 
-LLVM_PRJ_PATH="${ROOT_DIR}/extern/llvm-project/build"
+LLVM_PRJ_PATH=$ROOT_DIR/extern/llvm-project
 
 # Check if the LLVM and MLIR paths are set.
 if [ -z "${LLVM_PRJ_PATH}" ]; then
@@ -75,6 +45,17 @@ else
   make
 fi
 
-echo "Stream-HLS built successfully."
+# Export PATH and source Xilinx tools
+# Note: These exports will only work if script is sourced, not executed
+export PATH=$PATH:$ROOT_DIR/build/bin
+export PATH=$PATH:$ROOT_DIR/ampl.linux-intel64
+# Set LD_LIBRARY_PATH for Gurobi solver
+export LD_LIBRARY_PATH=$ROOT_DIR/ampl.linux-intel64:$LD_LIBRARY_PATH
 
-cd "${ROOT_DIR}"
+# Source Xilinx HLS settings if available
+if [ -f /afs/ece.cmu.edu/support/xilinx/xilinx.release/Vivado-2022.1/Vitis_HLS/2022.1/settings64.sh ]; then
+    source /afs/ece.cmu.edu/support/xilinx/xilinx.release/Vivado-2022.1/Vitis_HLS/2022.1/settings64.sh
+fi
+
+# Return to original directory (important when sourcing)
+cd $ROOT_DIR
