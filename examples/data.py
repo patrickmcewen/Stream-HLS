@@ -396,6 +396,82 @@ model_configs = {
       "input" : (
         randTensor(1, 64, 128, dtype=dtype),
       )
+    },
+        "gemm" : {
+      "class": "gemm",
+      "config" : {},
+      "input" : (
+        randTensor(200, 240, dtype=dtype),
+        randTensor(240, 220, dtype=dtype),
+        randTensor(200, 220, dtype=dtype)
+      )
+    },
+    "k2mm" : {
+      "class": "k2mm",
+      "config" : {},
+      "input" : (
+        randTensor(180, 210, dtype=dtype),     # A
+        randTensor(210, 190, dtype=dtype),     # B
+        randTensor(190, 220, dtype=dtype),     # C
+        randTensor(180, 220, dtype=dtype)      # D
+      )
+    },
+    "k3mm" : {
+      "class": "k3mm",
+      "config" : {},
+      "input" : (
+        randTensor(180, 180, dtype=dtype),
+        randTensor(180, 180, dtype=dtype),
+        randTensor(180, 180, dtype=dtype),
+        randTensor(180, 180, dtype=dtype)
+      )
+    },
+    "k3mm_call" : {
+      "class": "k3mm_call",
+      "config" : {},
+      "input" : (
+        randTensor(180, 200, dtype=dtype),
+        randTensor(200, 190, dtype=dtype),
+        randTensor(190, 220, dtype=dtype),
+        randTensor(220, 210, dtype=dtype)
+      )
+    },
+    "atax" : {
+      "class": "atax",
+      "config" : {},
+      "input" : (
+        randTensor(390, 410, dtype=dtype),  # A
+        randTensor(410, dtype=dtype)        # x
+      )
+    },
+    "bicg" : {
+      "class": "bicg",
+      "config" : {},
+      "input" : (
+        randTensor(410, 390, dtype=dtype),  # A
+        randTensor(410, 390, dtype=dtype),  # A copy
+        randTensor(410, dtype=dtype),       # r
+        randTensor(390, dtype=dtype)        # p
+      )
+    },
+    "mvt" : {
+      "class": "mvt",
+      "config" : {},
+      "input" : (
+        randTensor(400, 400, dtype=dtype),  # A
+        randTensor(400, 400, dtype=dtype),  # A copy
+        randTensor(400, dtype=dtype),       # y1
+        randTensor(400, dtype=dtype)        # y2
+      )
+    },
+    "gesummv" : {
+      "class": "gesummv",
+      "config" : {},
+      "input" : (
+        randTensor(250, 250, dtype=dtype),  # A
+        randTensor(250, 250, dtype=dtype),  # B
+        randTensor(250, dtype=dtype)       # x
+      )
     }
   }
 }
