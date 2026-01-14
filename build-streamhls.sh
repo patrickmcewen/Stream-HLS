@@ -59,3 +59,7 @@ fi
 
 # Return to original directory (important when sourcing)
 cd $ROOT_DIR
+chmod +x $PWD/ampl.linux-intel64/ampl
+chmod +x $PWD/ampl.linux-intel64/amplkey
+chmod +x $PWD/ampl.linux-intel64/leasefingerprint
+chmod +x $PWD/ampl.linux-intel64/gurobi
