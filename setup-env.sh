@@ -9,8 +9,8 @@ else
   echo "The environment 'streamhls' does not exist."
   echo "Creating environment 'streamhls'..."
   conda create -n streamhls python=3.11
-  pip install -r requirements.txt
   conda activate streamhls
+  pip install -r requirements.txt
 fi
 
 export ROOT_DIR="$(pwd)"
