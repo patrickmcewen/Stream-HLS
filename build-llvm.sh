@@ -46,3 +46,5 @@ if [ "${CMAKE_GENERATOR}" == "Ninja" ]; then
 else 
   make -j "$(nproc)"
 fi
+
+cd "${ROOT_DIR}"

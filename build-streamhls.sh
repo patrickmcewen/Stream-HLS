@@ -1,8 +1,5 @@
 #!/bin/bash
 
-source ../miniconda3/etc/profile.d/conda.sh
-conda activate streamhls
-
 # If ninja is available, use it.
 CMAKE_GENERATOR="Unix Makefiles"
 if which ninja &>/dev/null; then
