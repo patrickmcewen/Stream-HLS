@@ -3,8 +3,8 @@ set_top forward
 add_files src/[lindex $argv 0].cpp
 add_files -tb src/[lindex $argv 0]_tb.cpp
 open_solution "solution1" -flow_target vivado
-# set_part xcu200-fsgd2104-2-e
-set_part {xcu280-fsvh2892-2L-e}
+set_part xcu200-fsgd2104-2-e
+#set_part {xcu280-fsvh2892-2L-e}
 create_clock -name ap_clk -period 3.33
 config_compile -unsafe_math_optimizations
 # config_interface -m_axi_addr64 -m_axi_offset off -register_io off
