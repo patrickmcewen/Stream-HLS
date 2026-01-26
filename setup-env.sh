@@ -8,8 +8,16 @@ if conda env list | grep -q "\\bstreamhls\\b"; then
 else
   echo "The environment 'streamhls' does not exist."
   echo "Creating environment 'streamhls'..."
-  conda create -n streamhls python=3.11
+  conda create -n streamhls python=3.11 -y
   conda activate streamhls
+fi
+
+# Always ensure requirements are installed
+# Quick check: if torch and torch_mlir are both importable, skip pip install
+if python -c "import torch; import torch_mlir" 2>/dev/null; then
+  echo "Requirements already installed, skipping pip install..."
+else
+  echo "Installing/updating requirements..."
   pip install -r requirements.txt
 fi
 
