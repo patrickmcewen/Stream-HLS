@@ -12,6 +12,7 @@ parser.add_argument('-d', '--outdir', type=str, default='designs', help='Output 
 parser.add_argument('--dsps', type=int, default=2560*3, help='Number of DSPs')
 parser.add_argument('--tilelimit', type=int, default=10, help='Tile limit')
 parser.add_argument('--timelimit', type=int, default=20, help='Time limit')
+parser.add_argument('--bufferize', type=int, default=0, help='Bufferize function arguments')
 parser.add_argument('--tech-config', type=str, default='', help='Path to technology config JSON file')
 args = parser.parse_args()
 
@@ -21,7 +22,7 @@ timelimit=args.timelimit
 dsps=args.dsps
 tech_config=args.tech_config
 # bufferize function arguments flag
-bufferize=0
+bufferize=args.bufferize
 # minimize_on_chip_buffers function arguments flag
 minimize_on_chip_buffers=0
 dbg_point=14
