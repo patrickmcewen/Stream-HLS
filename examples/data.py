@@ -458,6 +458,19 @@ model_configs = {
         randTensor(1, 64, 128, dtype=dtype),
       )
     },
+    "Inference" : {
+      "class": "Inference",
+      "config" : dict(
+        embed_dim=128,
+        num_heads=4,
+        num_layers=1,
+        num_tokens=20000,
+        ff_dim=256
+      ),
+      "input" : (
+        randTensor(1, 512, 128, dtype=dtype),
+      )
+    },
         "gemm" : {
       "class": "gemm",
       "config" : {},
