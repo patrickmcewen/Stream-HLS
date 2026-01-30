@@ -108,15 +108,6 @@ model_configs = {
         randTensor(250, dtype=dtype)       # x
       )
     },
-    "syr2k" : {
-      "class": "syr2k",
-      "config" : {},
-      "input" : (
-        randTensor(200, 200, dtype=dtype),  # C
-        randTensor(200, 240, dtype=dtype),  # A
-        randTensor(200, 240, dtype=dtype)   # B
-      )
-    },
     "llama" : {
       "class": "Transformer",
       "config" : {},
@@ -456,6 +447,15 @@ model_configs = {
       ),
       "input" : (
         randTensor(1, 64, 128, dtype=dtype),
+      )
+    },
+    "syr2k" : {
+      "class": "syr2k",
+      "config" : {},
+      "input" : (
+        randTensor(200, 200, dtype=dtype),  # C
+        randTensor(200, 240, dtype=dtype),  # A
+        randTensor(200, 240, dtype=dtype)   # B
       )
     },
     "Inference" : {
