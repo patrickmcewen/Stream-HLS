@@ -9,6 +9,7 @@
 #include "streamhls/Transforms/Passes.h"
 #include "streamhls/Support/Utils.h"
 #include "streamhls/Support/DFG.h"
+#include "streamhls/Support/TechConfig.h"
 
 // include fstream for file IO
 #include <fstream>
@@ -26,17 +27,24 @@ struct NodeGraphPipelining
     : public NodeGraphPipeliningBase<NodeGraphPipelining> {
   NodeGraphPipelining() = default;
   NodeGraphPipelining(
-    std::string argReportFile, 
-    std::string argLoopPermutationType, 
+    std::string argReportFile,
+    std::string argLoopPermutationType,
     bool argOptimizeSchedule,
-    uint argTimeLimitMinutes
+    uint argTimeLimitMinutes,
+    std::string argTechConfigFile
   ) {
     reportFile = argReportFile;
     loopPermutationType = argLoopPermutationType;
     optimizeSchedule = argOptimizeSchedule;
     timeLimitMinutes = argTimeLimitMinutes;
+    techConfigFile = argTechConfigFile;
   }
   void runOnOperation() override {
+    // Load technology config if specified
+    if (!techConfigFile.empty()) {
+      initTechConfig(techConfigFile);
+    }
+
     LLVM_DEBUG(llvm::dbgs() << "NodeGraphPipelining\n");
     auto func = getOperation();
     auto context = func.getContext();
@@ -62,10 +70,11 @@ struct NodeGraphPipelining
 } // namespace
 
 std::unique_ptr<Pass> streamhls::createNodeGraphPipeliningPass(
-  std::string reportFile, 
-  std::string loopPermutationType, 
+  std::string reportFile,
+  std::string loopPermutationType,
   bool optimizeSchedule,
-  uint timeLimitMinutes
+  uint timeLimitMinutes,
+  std::string techConfigFile
 ) {
-  return std::make_unique<NodeGraphPipelining>(reportFile, loopPermutationType, optimizeSchedule, timeLimitMinutes);
+  return std::make_unique<NodeGraphPipelining>(reportFile, loopPermutationType, optimizeSchedule, timeLimitMinutes, techConfigFile);
 }

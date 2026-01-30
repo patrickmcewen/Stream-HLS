@@ -17,6 +17,8 @@
 #include "streamhls/Support/DFG.h"
 #include "streamhls/Support/AffineMemAccess.h"
 #include "streamhls/Support/Utils.h"
+#include "streamhls/Support/TechConfig.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 // #include "gurobi_c++.h"
 
 using namespace mlir;
@@ -1376,7 +1378,8 @@ static uint64_t getForLoopII(AffineForOp forOp){
         auto innerMostIV = innerMostLoop.getInductionVar();
         SmallVector<Operation *, 8> opsBetweenLoadAndStore;
         auto opName = getOpsBetweenLoadAndStore(cast<AffineLoadOp>(loadOp), cast<AffineStoreOp>(storeOp));
-        auto latency = (opName.getStringRef() == "arith.addf") ? 4 : 2;
+        // Use TechConfig to get operation latency instead of hardcoded values
+        auto latency = getTechConfig().getLatency(opName.getStringRef());
         II = latency;
         for(auto operand : storeMapOperands){
           if(operand == innerMostIV){
@@ -1707,11 +1710,21 @@ LogicalResult DFG::populateNodeInfo(bool enablePermutations){
       assert(false && "node is not a for op");
     }
     forOp->walk([&](Operation *op) {
+      // Use TechConfig to get DSP usage instead of hardcoded values
       if(isa<arith::AddFOp>(op)){
-        node.DSP_factor += 2;
+        node.DSP_factor += getTechConfig().getDspUsage("arith.addf");
+      }
+      if(isa<arith::SubFOp>(op)){
+        node.DSP_factor += getTechConfig().getDspUsage("arith.subf");
       }
       if(isa<arith::MulFOp>(op)){
-        node.DSP_factor += 3;
+        node.DSP_factor += getTechConfig().getDspUsage("arith.mulf");
+      }
+      if(isa<arith::DivFOp>(op)){
+        node.DSP_factor += getTechConfig().getDspUsage("arith.divf");
+      }
+      if(isa<math::ExpOp>(op)){
+        node.DSP_factor += getTechConfig().getDspUsage("math.exp");
       }
     });
     // collect stores and loads

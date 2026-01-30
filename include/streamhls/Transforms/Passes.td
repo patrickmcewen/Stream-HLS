@@ -130,7 +130,9 @@ def NodeGraphPipelining : Pass<"streamhls-graph-node-pipelining", "func::FuncOp"
     Option<"optimizeSchedule", "optimize-schedule", "bool",
             /*default=*/"false", "Optimize schedule through loop permutation using MINLP">,
     Option<"timeLimitMinutes", "time-limit-minutes", "uint",
-          /*default*/"1440", "MINLP solver time limit in seconds">
+          /*default*/"1440", "MINLP solver time limit in seconds">,
+    Option<"techConfigFile", "tech-config", "std::string",
+          /*default=*/"\"\"", "Path to JSON file with technology-specific latency and DSP values">
   ];
   let dependentDialects = ["mlir::streamhls::dataflow::DataflowDialect"];
 
@@ -149,7 +151,9 @@ def NodeParallelization : Pass<"streamhls-node-parallelization", "func::FuncOp">
     Option<"tilingLimit", "tiling-limit", "uint",
             /*default=*/"8", "Limit of tiling factor">,
     Option<"timeLimitMinutes", "time-limit-minutes", "uint",
-          /*default*/"1440", "MINLP solver time limit in seconds">
+          /*default*/"1440", "MINLP solver time limit in seconds">,
+    Option<"techConfigFile", "tech-config", "std::string",
+          /*default=*/"\"\"", "Path to JSON file with technology-specific latency and DSP values">
   ];
   let dependentDialects = ["mlir::streamhls::dataflow::DataflowDialect"];
 }
@@ -167,7 +171,9 @@ def CombinedOptimization : Pass<"streamhls-combined-optimization", "func::FuncOp
     Option<"tilingLimit", "tiling-limit", "uint",
             /*default=*/"8", "Limit of tiling factor">,
     Option<"timeLimitMinutes", "time-limit-minutes", "uint",
-          /*default*/"1440", "MINLP solver time limit in seconds">
+          /*default*/"1440", "MINLP solver time limit in seconds">,
+    Option<"techConfigFile", "tech-config", "std::string",
+          /*default=*/"\"\"", "Path to JSON file with technology-specific latency and DSP values">
   ];
   let dependentDialects = ["mlir::streamhls::dataflow::DataflowDialect"];
 }

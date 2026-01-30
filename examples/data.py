@@ -472,6 +472,20 @@ model_configs = {
         randTensor(250, 250, dtype=dtype),  # B
         randTensor(250, dtype=dtype)       # x
       )
+    },
+    "Inference" : {
+      "class": "Inference",
+      "config" : dict(
+        embed_dim=128,
+        num_heads=4,
+        num_layers=1,
+        num_tokens=20000,
+        ff_dim=256
+      ),
+      "input" : (
+        #torch.randint(0, 20000, (1, 512), dtype=torch.long),
+        randTensor(1, 512, 128, dtype=dtype),
+      )
     }
   }
 }

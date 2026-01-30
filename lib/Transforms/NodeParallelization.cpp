@@ -13,6 +13,7 @@
 #include "streamhls/Support/Utils.h"
 #include "streamhls/Support/AffineMemAccess.h"
 #include "streamhls/Support/DFG.h"
+#include "streamhls/Support/TechConfig.h"
 
 #include <regex>
 
@@ -27,18 +28,25 @@ struct NodeParallelization : public NodeParallelizationBase<NodeParallelization>
   NodeParallelization() = default;
   NodeParallelization(
     std::string argReportFile,
-    bool argParallelizeNodes, 
-    uint argDSPs, 
-    uint argTilingLimit, 
-    uint argTimeLimitMinutes
+    bool argParallelizeNodes,
+    uint argDSPs,
+    uint argTilingLimit,
+    uint argTimeLimitMinutes,
+    std::string argTechConfigFile
   ) {
     reportFile = argReportFile;
     parallelizeNodes = argParallelizeNodes;
     DSPs = argDSPs;
     tilingLimit = argTilingLimit;
     timeLimitMinutes = argTimeLimitMinutes;
+    techConfigFile = argTechConfigFile;
   }
   void runOnOperation() override {
+    // Load technology config if specified
+    if (!techConfigFile.empty()) {
+      initTechConfig(techConfigFile);
+    }
+
     func::FuncOp func = getOperation();
     auto context = func.getContext();
     OpBuilder builder(context);
@@ -74,14 +82,16 @@ std::unique_ptr<Pass> streamhls::createNodeParallelizationPass(
   std::string reportFile,
   bool parallelizeNodes,
   uint DSPs,
-  uint tilingLimit, 
-  uint timeLimitMinutes
+  uint tilingLimit,
+  uint timeLimitMinutes,
+  std::string techConfigFile
 ) {
   return std::make_unique<NodeParallelization>(
-    reportFile, 
-    parallelizeNodes, 
-    DSPs, 
+    reportFile,
+    parallelizeNodes,
+    DSPs,
     tilingLimit,
-    timeLimitMinutes
+    timeLimitMinutes,
+    techConfigFile
   );
 }

@@ -62,24 +62,27 @@ std::unique_ptr<Pass> createEliminateArrayOfStreamsPass();
 
 std::unique_ptr<Pass> createPrintDataflowGraphPass(std::string dotFileName = "graph.dot", bool mergeNodes = true);
 std::unique_ptr<Pass> createNodeGraphPipeliningPass(
-  std::string reportFile = "report.csv", 
-  std::string loopPermutationType = "Default", 
+  std::string reportFile = "report.csv",
+  std::string loopPermutationType = "Default",
   bool optimizeSchedule = false,
-  uint timeLimitMinutes = 1440
+  uint timeLimitMinutes = 1440,
+  std::string techConfigFile = ""
 );
 std::unique_ptr<Pass> createNodeParallelizationPass(
-  std::string reportFile = "model.mod", 
+  std::string reportFile = "model.mod",
   bool parallelizeNodes = false,
   uint DSPs = 512,
   uint tilingLimit = 8,
-  uint timeLimitMinutes = 1440
+  uint timeLimitMinutes = 1440,
+  std::string techConfigFile = ""
 );
 std::unique_ptr<Pass> createCombinedOptimizationPass(
-  std::string reportFile = "model.mod", 
+  std::string reportFile = "model.mod",
   bool parallelizeNodes = false,
   uint DSPs = 512,
   uint tilingLimit = 8,
-  uint timeLimitMinutes = 1440
+  uint timeLimitMinutes = 1440,
+  std::string techConfigFile = ""
 );
 
 std::unique_ptr<Pass> createMinimalBufferSizesPass();

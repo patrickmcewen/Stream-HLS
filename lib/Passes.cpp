@@ -72,6 +72,9 @@ struct StreamHLSKernelPipelineOptions
   Option<bool> minimizeOnChipBuffers{
       *this, "minimize-on-chip-buffers", llvm::cl::init(false),
       llvm::cl::desc("Minimize on-chip buffers")};
+  Option<std::string> techConfigFile{
+      *this, "tech-config", llvm::cl::init(""),
+      llvm::cl::desc("Path to JSON file with technology-specific latency and DSP values")};
 };
 } // namespace
 
@@ -167,11 +170,12 @@ void streamhls::registerStreamHLSKernelPipeline() {
 
         if(opts.combinedOptimization){
           pm.addPass(streamhls::createCombinedOptimizationPass(
-            opts.reportPath, 
-            opts.parallelizeNodes, 
-            opts.DSPs, 
+            opts.reportPath,
+            opts.parallelizeNodes,
+            opts.DSPs,
             opts.tilingLimit,
-            opts.timeLimitMinutes
+            opts.timeLimitMinutes,
+            opts.techConfigFile
           ));
           pm.addPass(mlir::affine::createAffineLoopNormalizePass());
           pm.addPass(mlir::createCanonicalizerPass());
@@ -179,19 +183,21 @@ void streamhls::registerStreamHLSKernelPipeline() {
           // if(opts.optimizeSchedule){
             pm.addPass(streamhls::createNodeGraphPipeliningPass(
               opts.reportPath,
-              opts.loopPermutationType, 
+              opts.loopPermutationType,
               opts.optimizeSchedule,
-              opts.timeLimitMinutes
+              opts.timeLimitMinutes,
+              opts.techConfigFile
             ));
             pm.addPass(mlir::createCanonicalizerPass());
           // }
           if(opts.parallelizeNodes){
             pm.addPass(streamhls::createNodeParallelizationPass(
-              opts.reportPath, 
-              opts.parallelizeNodes, 
-              opts.DSPs, 
+              opts.reportPath,
+              opts.parallelizeNodes,
+              opts.DSPs,
               opts.tilingLimit,
-              opts.timeLimitMinutes
+              opts.timeLimitMinutes,
+              opts.techConfigFile
             ));
             pm.addPass(mlir::affine::createAffineLoopNormalizePass());
             pm.addPass(mlir::createCanonicalizerPass());

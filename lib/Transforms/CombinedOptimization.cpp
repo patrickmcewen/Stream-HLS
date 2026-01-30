@@ -13,6 +13,7 @@
 #include "streamhls/Support/Utils.h"
 #include "streamhls/Support/AffineMemAccess.h"
 #include "streamhls/Support/DFG.h"
+#include "streamhls/Support/TechConfig.h"
 
 #include <regex>
 
@@ -30,15 +31,22 @@ struct CombinedOptimization : public CombinedOptimizationBase<CombinedOptimizati
     bool argParallelizeNodes,
     uint argDSPs,
     uint argTilingLimit,
-    uint argTimeLimitMinutes
+    uint argTimeLimitMinutes,
+    std::string argTechConfigFile
   ) {
     reportFile = argReportFile;
     parallelizeNodes = argParallelizeNodes;
     DSPs = argDSPs;
     tilingLimit = argTilingLimit;
     timeLimitMinutes = argTimeLimitMinutes;
+    techConfigFile = argTechConfigFile;
   }
   void runOnOperation() override {
+    // Load technology config if specified
+    if (!techConfigFile.empty()) {
+      initTechConfig(techConfigFile);
+    }
+
     func::FuncOp func = getOperation();
     auto context = func.getContext();
     OpBuilder builder(context);
@@ -65,13 +73,15 @@ std::unique_ptr<Pass> streamhls::createCombinedOptimizationPass(
   bool parallelizeNodes,
   uint DSPs,
   uint tilingLimit,
-  uint timeLimitMinutes
+  uint timeLimitMinutes,
+  std::string techConfigFile
 ) {
   return std::make_unique<CombinedOptimization>(
     reportFile,
     parallelizeNodes,
     DSPs,
     tilingLimit,
-    timeLimitMinutes
+    timeLimitMinutes,
+    techConfigFile
   );
 }

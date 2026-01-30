@@ -35,7 +35,7 @@ parser.add_argument('--bufferize', type=int, required=False, default=0)
 parser.add_argument('--conv', type=int, required=False, default=0)
 parser.add_argument('--minimize-on-chip-buffers', type=int, required=False, default=0)
 parser.add_argument('--compile_only', type=int, required=False, default=0)
-
+parser.add_argument('--tech-config', type=str, required=False, default='', help='Path to technology config JSON file')
 
 args = parser.parse_args()
 print("prjsdir: ", args.prjsdir)
@@ -57,6 +57,7 @@ bufferize = args.bufferize
 conv = args.conv
 minimize_on_chip_buffers = args.minimize_on_chip_buffers
 compile_only = args.compile_only
+tech_config = args.tech_config
 
 config = {
   "Model": model,
@@ -137,6 +138,7 @@ if compile_only == 0:
   logger.info(f'MLIR to HLS for {model}')
 
   # kernel pipeline
+  tech_config_opt = f'tech-config={tech_config}' if tech_config else ''
   cmd = f'streamhls-opt {prj_path}/mlir/input/{model}.mlir \
     -streamhls-kernel-pipeline="top-func=forward \
       graph-file={prj_path}/mlir/graphs/graph\
@@ -150,6 +152,7 @@ if compile_only == 0:
       bufferize-func-args={bufferize} \
       optimize-conv-reuse={conv} \
       minimize-on-chip-buffers={minimize_on_chip_buffers} \
+      {tech_config_opt} \
       debug-point={debug}" \
     > {prj_path}/mlir/kernel/{model}.mlir'
   run_command(cmd)
