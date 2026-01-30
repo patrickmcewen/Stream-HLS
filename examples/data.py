@@ -79,6 +79,16 @@ model_configs = {
         randTensor(390, dtype=dtype)        # p
       )
     },
+    "kernel_bicg" : {
+      "class": "bicg",
+      "config" : {},
+      "input" : (
+        randTensor(410, 390, dtype=dtype),  # A
+        randTensor(410, 390, dtype=dtype),  # A copy
+        randTensor(410, dtype=dtype),       # r
+        randTensor(390, dtype=dtype)        # p
+      )
+    },
     "mvt" : {
       "class": "mvt",
       "config" : {},
@@ -454,6 +464,16 @@ model_configs = {
         randTensor(390, dtype=dtype)        # p
       )
     },
+    "kernel_bicg" : {
+      "class": "bicg",
+      "config" : {},
+      "input" : (
+        randTensor(410, 390, dtype=dtype),  # A
+        randTensor(410, 390, dtype=dtype),  # A copy
+        randTensor(410, dtype=dtype),       # r
+        randTensor(390, dtype=dtype)        # p
+      )
+    },
     "mvt" : {
       "class": "mvt",
       "config" : {},
@@ -473,18 +493,90 @@ model_configs = {
         randTensor(250, dtype=dtype)       # x
       )
     },
-    "Inference" : {
-      "class": "Inference",
+    "gemmv" : {
+      "class": "gemmv",
+      "config" : {},
+      "input" : (
+        randTensor(250, 250, dtype=dtype),  # A
+        randTensor(250, dtype=dtype),       # x
+        randTensor(250, dtype=dtype)        # y
+      )
+    },
+    "kernel_2mm" : {
+      "class": "kernel_2mm",
+      "config" : {},
+      "input" : (
+        randTensor(200, 200, dtype=dtype),  # A
+        randTensor(200, 200, dtype=dtype),  # B
+        randTensor(200, 200, dtype=dtype),  # C
+        randTensor(200, 200, dtype=dtype)   # D
+      )
+    },
+    "kernel_3mm" : {
+      "class": "kernel_3mm",
+      "config" : {},
+      "input" : (
+        randTensor(180, 180, dtype=dtype),  # A
+        randTensor(180, 180, dtype=dtype),  # B
+        randTensor(180, 180, dtype=dtype),  # C
+        randTensor(180, 180, dtype=dtype)   # D
+      )
+    },
+    "kernel_atax" : {
+      "class": "kernel_atax",
+      "config" : {},
+      "input" : (
+        randTensor(390, 410, dtype=dtype),  # A
+        randTensor(410, dtype=dtype)        # x
+      )
+    },
+    "kernel_doitgen" : {
+      "class": "kernel_doitgen",
+      "config" : {},
+      "input" : (
+        randTensor(32, 32, 32, dtype=dtype),  # A (NR, NQ, NP)
+        randTensor(32, 32, dtype=dtype)       # C4 (NP, NP)
+      )
+    },
+    "attention_head" : {
+      "class": "attention_head",
+      "config" : {},
+      "input" : (
+        randTensor(64, 128, dtype=dtype),  # query
+        randTensor(64, 128, dtype=dtype),  # key
+        randTensor(64, 128, dtype=dtype)   # value
+      )
+    },
+    "backprop" : {
+      "class": "backprop",
       "config" : dict(
-        embed_dim=128,
-        num_heads=4,
-        num_layers=1,
-        num_tokens=20000,
-        ff_dim=256
+        input_dimension=65,
+        nodes_per_layer=16,
+        possible_outputs=10,
+        learning_rate=0.01
       ),
       "input" : (
-        #torch.randint(0, 20000, (1, 512), dtype=torch.long),
-        randTensor(1, 512, 128, dtype=dtype),
+        randTensor(32, 65, dtype=dtype),   # training_data
+        randTensor(32, 10, dtype=dtype)    # training_targets
+      )
+    },
+    "bitnet" : {
+      "class": "bitnet",
+      "config" : {},
+      "input" : (
+        torch.randint(0, 20000, (1, 1024)),
+      )
+    },
+    "digitrec_sw" : {
+      "class": "digitrec_sw",
+      "config" : dict(
+        k_const=3,
+        num_classes=10,
+        class_size=180
+      ),
+      "input" : (
+        torch.randint(0, 256, (1800, 196), dtype=torch.int32),  # training_set
+        torch.randint(0, 256, (50, 196), dtype=torch.int32)     # test_set
       )
     }
   }
