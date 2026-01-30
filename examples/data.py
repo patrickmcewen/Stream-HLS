@@ -107,6 +107,50 @@ model_configs = {
         randTensor(250, 250, dtype=dtype),  # B
         randTensor(250, dtype=dtype)       # x
       )
+    },
+    "syr2k" : {
+      "class": "syr2k",
+      "config" : {},
+      "input" : (
+        randTensor(200, 200, dtype=dtype),  # C
+        randTensor(200, 240, dtype=dtype),  # A
+        randTensor(200, 240, dtype=dtype)   # B
+      )
+    },
+    "llama" : {
+      "class": "Transformer",
+      "config" : {},
+      "input" : (
+        torch.randint(0, 128256, (1, 8), dtype=torch.long),
+      )
+    },
+    "mobilenet" : {
+      "class": "MobileNet",
+      "config" : {},
+      "input" : (
+        randTensor(1, 3, 32, 32, dtype=dtype),
+      )
+    },
+    "resnet18" : {
+      "class": "resnet18",
+      "config" : {},
+      "input" : (
+        randTensor(1, 3, 224, 224, dtype=dtype),
+      )
+    },
+    "sgd_sw" : {
+      "class": "sgd_sw",
+      "config" : dict(
+        num_features=64,
+        num_training=100,
+        num_epochs=5,
+        step_size=0.01
+      ),
+      "input" : (
+        randTensor(6400, dtype=dtype),  # data (num_training * num_features flattened)
+        randTensor(100, dtype=dtype),   # label
+        randTensor(64, dtype=dtype)     # theta
+      )
     }
   },
   # mlps
@@ -166,6 +210,13 @@ model_configs = {
       ),
       "input" : (
         randTensor(1, 16, 56, 56, dtype=dtype),
+      )
+    },
+    "lenet" : {
+      "class": "lenet",
+      "config" : {},
+      "input" : (
+        randTensor(1, 3, 32, 32, dtype=dtype),
       )
     }
   },
@@ -536,6 +587,17 @@ model_configs = {
       "input" : (
         randTensor(32, 32, 32, dtype=dtype),  # A (NR, NQ, NP)
         randTensor(32, 32, dtype=dtype)       # C4 (NP, NP)
+      )
+    },
+    "kernel_mvt" : {
+      "class": "kernel_mvt",
+      "config" : {},
+      "input" : (
+        randTensor(400, dtype=dtype),       # x1
+        randTensor(400, dtype=dtype),       # x2
+        randTensor(400, dtype=dtype),       # y_1
+        randTensor(400, dtype=dtype),       # y_2
+        randTensor(400, 400, dtype=dtype)   # A
       )
     },
     "attention_head" : {
