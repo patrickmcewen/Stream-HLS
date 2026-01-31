@@ -108,39 +108,11 @@ model_configs = {
         randTensor(250, dtype=dtype)       # x
       )
     },
-    "llama" : {
-      "class": "Transformer",
-      "config" : {},
-      "input" : (
-        torch.randint(0, 128256, (1, 8), dtype=torch.long),
-      )
-    },
-    "mobilenet" : {
-      "class": "MobileNet",
-      "config" : {},
-      "input" : (
-        randTensor(1, 3, 32, 32, dtype=dtype),
-      )
-    },
     "resnet18" : {
       "class": "resnet18",
       "config" : {},
       "input" : (
         randTensor(1, 3, 224, 224, dtype=dtype),
-      )
-    },
-    "sgd_sw" : {
-      "class": "sgd_sw",
-      "config" : dict(
-        num_features=64,
-        num_training=100,
-        num_epochs=5,
-        step_size=0.01
-      ),
-      "input" : (
-        randTensor(6400, dtype=dtype),  # data (num_training * num_features flattened)
-        randTensor(100, dtype=dtype),   # label
-        randTensor(64, dtype=dtype)     # theta
       )
     }
   },
@@ -203,13 +175,6 @@ model_configs = {
         randTensor(1, 16, 56, 56, dtype=dtype),
       )
     },
-    "lenet" : {
-      "class": "lenet",
-      "config" : {},
-      "input" : (
-        randTensor(1, 3, 32, 32, dtype=dtype),
-      )
-    }
   },
   # transformers
   "transformers" : {
@@ -449,6 +414,13 @@ model_configs = {
         randTensor(1, 64, 128, dtype=dtype),
       )
     },
+    "mobilenet" : {
+      "class": "MobileNet",
+      "config" : {},
+      "input" : (
+        randTensor(1, 3, 32, 32, dtype=dtype),
+      )
+    },
     "syr2k" : {
       "class": "syr2k",
       "config" : {},
@@ -456,6 +428,54 @@ model_configs = {
         randTensor(200, 200, dtype=dtype),  # C
         randTensor(200, 240, dtype=dtype),  # A
         randTensor(200, 240, dtype=dtype)   # B
+      )
+    },
+    "vgg16" : {
+      "class": "VGG16",
+      "config" : {},
+      "input" : (
+        randTensor(1, 3, 32, 32, dtype=dtype),
+      )
+    },
+    "sgd_sw" : {
+      "class": "sgd_sw",
+      "config" : dict(
+        num_features=64,
+        num_training=100,
+        num_epochs=5,
+        step_size=0.01
+      ),
+      "input" : (
+        randTensor(6400, dtype=dtype),  # data (num_training * num_features flattened)
+        randTensor(100, dtype=dtype),   # label
+        randTensor(64, dtype=dtype)     # theta
+      )
+    },
+    "backprop" : {
+      "class": "backprop",
+      "config" : dict(
+        input_dimension=65,
+        nodes_per_layer=16,
+        possible_outputs=10,
+        learning_rate=0.01
+      ),
+      "input" : (
+        randTensor(32, 65, dtype=dtype),   # training_data
+        randTensor(32, 10, dtype=dtype)    # training_targets
+      )
+    },
+    "lenet" : {
+      "class": "lenet",
+      "config" : {},
+      "input" : (
+        randTensor(1, 3, 32, 32, dtype=dtype),
+      )
+    },
+    "llama" : {
+      "class": "Transformer",
+      "config" : {},
+      "input" : (
+        torch.randint(0, 128256, (1, 8), dtype=torch.long),
       )
     },
     "Inference" : {
@@ -620,19 +640,6 @@ model_configs = {
         randTensor(64, 128, dtype=dtype),  # query
         randTensor(64, 128, dtype=dtype),  # key
         randTensor(64, 128, dtype=dtype)   # value
-      )
-    },
-    "backprop" : {
-      "class": "backprop",
-      "config" : dict(
-        input_dimension=65,
-        nodes_per_layer=16,
-        possible_outputs=10,
-        learning_rate=0.01
-      ),
-      "input" : (
-        randTensor(32, 65, dtype=dtype),   # training_data
-        randTensor(32, 10, dtype=dtype)    # training_targets
       )
     },
     "bitnet" : {
