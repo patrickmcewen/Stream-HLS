@@ -63,7 +63,12 @@ if __name__ == "__main__":
           
           # Try to find the Python file in different possible locations
           module_file = os.path.join(benchmark_path_abs, f"{module_name}.py")
-          assert os.path.exists(module_file), f"Module file {module_file} does not exist"
+          if not os.path.exists(module_file):
+            fallback_module_file = os.path.join(benchmark_path_abs, f"{model}.py")
+            assert os.path.exists(fallback_module_file), (
+              f"Module file {module_file} does not exist, and fallback file {fallback_module_file} does not exist"
+            )
+            module_file = fallback_module_file
         
 
           # Load module directly from file

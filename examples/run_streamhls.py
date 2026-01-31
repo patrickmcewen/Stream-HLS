@@ -52,6 +52,13 @@ elif opt == 1:
   paralOpt=0  
   combOpt=0
 
+# Work around kernel pipeline crashes for llama.
+if kernel == "llama":
+  permOpt = 0
+  paralOpt = 0
+  combOpt = 0
+  dbg_point = 8
+
 
 outDir=f'designs/{benchmark}/opt{opt}/{kernel}_{dsps}' if args.outdir == "designs" else args.outdir
 

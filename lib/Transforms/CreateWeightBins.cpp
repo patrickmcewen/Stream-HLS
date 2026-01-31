@@ -104,6 +104,12 @@ struct CreateWeightBins : public CreateWeightBinsBase<CreateWeightBins> {
     auto module = getOperation();
     auto context = module.getContext();
     auto func = module.lookupSymbol<func::FuncOp>(topFuncName);
+    if (!func) {
+      module.emitError("CreateWeightBins: top function not found: ")
+          << topFuncName;
+      signalPassFailure();
+      return;
+    }
     mlir::RewritePatternSet patterns(context);
     patterns.add<ConvertWeightsToBins>(context, keepWeights);
     (void)applyPatternsAndFoldGreedily(func, std::move(patterns));

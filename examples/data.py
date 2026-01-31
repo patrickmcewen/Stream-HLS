@@ -475,7 +475,7 @@ model_configs = {
       "class": "Transformer",
       "config" : {},
       "input" : (
-        torch.randint(0, 128256, (1, 8), dtype=torch.long),
+        torch.randint(0, 32000, (1, 8), dtype=torch.long),
       )
     },
     "Inference" : {

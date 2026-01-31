@@ -116,13 +116,16 @@ def run_command(cmd):
         logger.info(result.stdout)
     if result.stderr:
         logger.error(result.stderr)
+    if result.returncode != 0:
+        logger.error(f"Command failed ({result.returncode}): {cmd}")
+        sys.exit(result.returncode)
     return result.returncode
 
 if compile_only == 0:
   # start time
   start_time = time.time()
 
-  # host pipeline
+  # host pipeline (always run)
   cmd = f'streamhls-opt {prj_path}/mlir/input/{model}.mlir \
     -streamhls-host-pipeline \
     > {prj_path}/mlir/host/{model}.mlir'
