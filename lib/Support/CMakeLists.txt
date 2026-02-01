@@ -1,11 +1,17 @@
 # Copyright HeteroCL authors. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-file(GLOB globbed *.cpp)
+set(SUPPORT_SOURCES
+  AffineMemAccess.cpp
+  DataflowGraph.cpp
+  DFG.cpp
+  TechConfig.cpp
+  Utils.cpp
+)
 
 
 add_mlir_library(MLIR_StreamHLS_Support
-  ${globbed}
+  ${SUPPORT_SOURCES}
   
   DEPENDS
   MLIRDataflowIncGen

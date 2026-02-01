@@ -180,7 +180,7 @@ void streamhls::registerStreamHLSKernelPipeline() {
           pm.addPass(mlir::affine::createAffineLoopNormalizePass());
           pm.addPass(mlir::createCanonicalizerPass());
         }else{
-          // if(opts.optimizeSchedule){
+          if(opts.optimizeSchedule){
             pm.addPass(streamhls::createNodeGraphPipeliningPass(
               opts.reportPath,
               opts.loopPermutationType,
@@ -189,7 +189,7 @@ void streamhls::registerStreamHLSKernelPipeline() {
               opts.techConfigFile
             ));
             pm.addPass(mlir::createCanonicalizerPass());
-          // }
+          }
           if(opts.parallelizeNodes){
             pm.addPass(streamhls::createNodeParallelizationPass(
               opts.reportPath,

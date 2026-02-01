@@ -262,9 +262,13 @@ if compile_only == 0:
         break
 
   if report["Sequential Cycles"] is None and report["Parallel Cycles"] is None and report["Combined Cycles"] is None:
-    cmd = f'python {prj_path}/mlir/intermediates/{model}_default.py'
-    output = subprocess.check_output(cmd, shell=True)
-    report["Sequential Cycles"] = int(output)
+    default_py = prj_path / "mlir" / "intermediates" / f"{model}_default.py"
+    if default_py.exists():
+      cmd = f'python {default_py}'
+      output = subprocess.check_output(cmd, shell=True)
+      report["Sequential Cycles"] = int(output)
+    else:
+      report["Sequential Cycles"] = None
 
   if report["Permutation Design Space"] is not None and report["Parallelization Design Space"] is not None:
     report["Combined Design Space"] = report["Permutation Design Space"] * report["Parallelization Design Space"]

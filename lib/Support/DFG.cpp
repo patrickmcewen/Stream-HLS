@@ -1678,6 +1678,9 @@ static bool isContiguousSubset(SmallVectorImpl<unsigned>& group, SmallVectorImpl
   return true;
 }
 static uint64_t getNumberOfDivisors(uint64_t num){
+  if (num == 0) {
+    return 1;
+  }
   uint64_t count = 0;
   for(uint64_t i = 1; i <= num; i++){
     if(num % i == 0){
@@ -4082,7 +4085,13 @@ bool DFG::applyNodePermutations(DFG::PermutationType permType){
       LLVM_DEBUG(
         llvm::dbgs() << "band size: " << band.size() << "\n";
       );
+      if (node.nodeInfo.empty()) {
+        continue;
+      }
       auto permIdx = permType == DFG::PermutationType::Minimize ? node.minPermIdx : node.maxPermIdx;
+      if (permIdx >= node.nodeInfo.size()) {
+        continue;
+      }
       auto& permMap = node.nodeInfo[permIdx].permutation;
       if(permMap.size() > 0){
         auto newRoot = band[permuteLoops(band, permMap)];
@@ -4224,7 +4233,13 @@ bool DFG::applyNodeParallelization(){
             }
             for(auto loop : llvm::enumerate(band)){
               if(loop.value() == srcLoop){
+                if (loop.index() >= node.tilingFactors.size()) {
+                  continue;
+                }
                 unsigned factor = node.tilingFactors[loop.index()];
+                if (factor == 0) {
+                  continue;
+                }
                 factors.push_back(factor);
                 kinds.push_back(dataflow::PartitionKind::CYCLIC);
                 break;
@@ -4232,11 +4247,13 @@ bool DFG::applyNodeParallelization(){
             }
           // }
         }
-        if(!applyArrayPartition(memRef, factors, kinds, true)){
-          // llvm::dbgs() << "Failed to apply array partition for load\n";
-          // memRef.dump();
-          // llvm::dbgs() << "Factors size: " << factors.size() << "\n";
-          // llvm::dbgs() << "Kinds size: " << kinds.size() << "\n";
+        if(!factors.empty() && factors.size() == kinds.size()){
+          if(!applyArrayPartition(memRef, factors, kinds, true)){
+            // llvm::dbgs() << "Failed to apply array partition for load\n";
+            // memRef.dump();
+            // llvm::dbgs() << "Factors size: " << factors.size() << "\n";
+            // llvm::dbgs() << "Kinds size: " << kinds.size() << "\n";
+          }
         }
       }
       for(auto store : stores){
@@ -4259,7 +4276,13 @@ bool DFG::applyNodeParallelization(){
             }
             for(auto loop : llvm::enumerate(band)){
               if(loop.value() == srcLoop){
+                if (loop.index() >= node.tilingFactors.size()) {
+                  continue;
+                }
                 unsigned factor = node.tilingFactors[loop.index()];
+                if (factor == 0) {
+                  continue;
+                }
                 factors.push_back(factor);
                 kinds.push_back(dataflow::PartitionKind::CYCLIC);
                 break;
@@ -4267,12 +4290,14 @@ bool DFG::applyNodeParallelization(){
             }
           // }
         }
-        if(!applyArrayPartition(memRef, factors, kinds, true)){
-          // llvm::dbgs() << "Failed to apply array partition for store\n";
-          // memRef.dump();
-          // llvm::dbgs() << "Factors size: " << factors.size() << "\n";
-          // llvm::dbgs() << "Kinds size: " << kinds.size() << "\n";
-        }      
+        if(!factors.empty() && factors.size() == kinds.size()){
+          if(!applyArrayPartition(memRef, factors, kinds, true)){
+            // llvm::dbgs() << "Failed to apply array partition for store\n";
+            // memRef.dump();
+            // llvm::dbgs() << "Factors size: " << factors.size() << "\n";
+            // llvm::dbgs() << "Kinds size: " << kinds.size() << "\n";
+          }
+        }
       }
       
     }
@@ -4306,7 +4331,16 @@ bool DFG::applyNodeParallelization(){
       );
       SmallVector<AffineForOp, 6> tiledNest;
       auto bandSize = band.size();
-      if (failed(tilePerfectlyNested(band, node.tilingFactors, &tiledNest))) {
+      if (node.tilingFactors.size() != bandSize) {
+        continue;
+      }
+      SmallVector<unsigned, 6> safeTilingFactors(node.tilingFactors.begin(), node.tilingFactors.end());
+      for (auto &factor : safeTilingFactors) {
+        if (factor == 0) {
+          factor = 1;
+        }
+      }
+      if (failed(tilePerfectlyNested(band, safeTilingFactors, &tiledNest))) {
         // An empty band always succeeds.
         assert(!band.empty() && "guaranteed to succeed on empty bands");
         LLVM_DEBUG(band.front()->emitRemark("loop tiling failed!\n"));

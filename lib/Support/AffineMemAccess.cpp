@@ -37,6 +37,13 @@ static SmallVector<unsigned> inversePerm(const SmallVectorImpl<unsigned> &permut
   return inversePermutation;
 }
 
+static AffineMap safePermutationMap(ArrayRef<unsigned> permutation, MLIRContext *context) {
+  if (permutation.empty()) {
+    return AffineMap::getMultiDimIdentityMap(0, context);
+  }
+  return AffineMap::getPermutationMap(permutation, context);
+}
+
 void mlir::streamhls::getRelevantAndIrrelevantEnclosingAffineOps(Operation &op,
                                          SmallVectorImpl<Operation *> *relevantOps,
                                          SmallVectorImpl<Operation *> *irrelevantOps
@@ -1102,6 +1109,9 @@ AffineMap streamhls::getAccessPattern(Operation *op){
   }else{
     assert(false && "op is not a load or store operation");
   }
+  if (mapOperands.empty()) {
+    return accessMap;
+  }
 
 
   // AffineMap simplifiedAccessMap;
@@ -1127,6 +1137,9 @@ AffineMap streamhls::getAccessPattern(Operation *op){
       relevantLoops.push_back(forOp);
       relevantOperands.push_back(iv);
     }
+  }
+  if (relevantOperands.empty()) {
+    return accessMap;
   }
   if(relevantLoops.size() != mapOperands.size()){
     assert(false && "relevantLoops.size() != mapOperands.size()");
@@ -1166,7 +1179,13 @@ AffineMap streamhls::getAccessPattern(Operation *op){
   // }
   // llvm::dbgs() << "\n";
   // auto map1 = AffineMap::getPermutationMap(orderingIndices1, op->getContext());
-  auto map2 = AffineMap::getPermutationMap(orderingIndices2, op->getContext());
+  if (orderingIndices2.empty()) {
+    return accessMap;
+  }
+  if (orderingIndices2.empty()) {
+    return accessMap;
+  }
+  auto map2 = safePermutationMap(orderingIndices2, op->getContext());
 
   // map2.dump();
   // accessMap.dump();
@@ -1210,8 +1229,8 @@ AffineMap streamhls::getAccessPattern(Operation *op){
       }
     }
   }
-  auto newMap = AffineMap::getPermutationMap(perm, op->getContext());
-  auto newInverseMap = AffineMap::getPermutationMap(inversePerm(perm), op->getContext());
+  auto newMap = safePermutationMap(perm, op->getContext());
+  auto newInverseMap = safePermutationMap(inversePerm(perm), op->getContext());
   // auto newMap3 = AffineMap::getPermutationMap(perm3, op->getContext());
   // newMap.dump();
 
@@ -1317,7 +1336,7 @@ AffineMap streamhls::getMinimalAccessPattern(Operation *op){
     }
   }
 
-  auto map2 = AffineMap::getPermutationMap(orderingIndices2, op->getContext());
+  auto map2 = safePermutationMap(orderingIndices2, op->getContext());
 
   auto outMap = accessMap.compose(map2);
 
@@ -1353,7 +1372,10 @@ AffineMap streamhls::getMinimalAccessPattern(Operation *op){
     // assert(false && "locations.size() != relevantOperands.size()");
   }
 
-  auto simplifiedMap = AffineMap::getPermutationMap(locations, op->getContext());
+  if (locations.empty()) {
+    return accessMap;
+  }
+  auto simplifiedMap = safePermutationMap(locations, op->getContext());
   
   return simplifiedMap;
 }
