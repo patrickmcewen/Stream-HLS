@@ -1,0 +1,20 @@
+{
+  "dsp": 2560,
+  "bram": 150,
+  "latency": {
+    "fadd": 4,
+    "fsub": 4,
+    "fmul": 4,
+    "fdiv": 15,
+    "fcmp": 1,
+    "fexp": 8
+  },
+  "dsp_usage": {
+    "fadd": 2,
+    "fsub": 2,
+    "fmul": 3,
+    "fdiv": 0,
+    "fcmp": 0,
+    "fexp": 7
+  }
+}
