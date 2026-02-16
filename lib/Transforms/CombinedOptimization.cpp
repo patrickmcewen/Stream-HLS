@@ -32,7 +32,8 @@ struct CombinedOptimization : public CombinedOptimizationBase<CombinedOptimizati
     uint argDSPs,
     uint argTilingLimit,
     uint argTimeLimitMinutes,
-    std::string argTechConfigFile
+    std::string argTechConfigFile,
+    std::string argSolutionFile
   ) {
     reportFile = argReportFile;
     parallelizeNodes = argParallelizeNodes;
@@ -40,6 +41,7 @@ struct CombinedOptimization : public CombinedOptimizationBase<CombinedOptimizati
     tilingLimit = argTilingLimit;
     timeLimitMinutes = argTimeLimitMinutes;
     techConfigFile = argTechConfigFile;
+    solutionFile = argSolutionFile;
   }
   void runOnOperation() override {
     // Load technology config if specified
@@ -56,14 +58,22 @@ struct CombinedOptimization : public CombinedOptimizationBase<CombinedOptimizati
       LLVM_DEBUG(llvm::dbgs() << "DFG init failed\n");
       return;
     }
-    graph.createCombinedOptimizationPerformanceModel(reportFile, DSPs, tilingLimit, timeLimitMinutes);
 
-    graph.callCombinedOptimizationSolver(reportFile);
+    if (!solutionFile.empty()) {
+      // REPLAY MODE: load pre-computed decisions, skip GUROBI solve
+      llvm::dbgs() << "Replay mode: loading solution from " << solutionFile << "\n";
+      graph.loadSolutionFromFile(solutionFile);
+    } else {
+      // NORMAL MODE: solve with GUROBI
+      graph.createCombinedOptimizationPerformanceModel(reportFile, DSPs, tilingLimit, timeLimitMinutes);
+      graph.callCombinedOptimizationSolver(reportFile);
+      graph.createCombinedOptimizationPythonModel(reportFile);
+      // Save solution for future replay
+      graph.saveSolutionToFile(reportFile + "_solution.json");
+    }
 
-    graph.createCombinedOptimizationPythonModel(reportFile);
-    
     graph.applyCombinedOptimization();
- 
+
   }
 };
 }
@@ -74,7 +84,8 @@ std::unique_ptr<Pass> streamhls::createCombinedOptimizationPass(
   uint DSPs,
   uint tilingLimit,
   uint timeLimitMinutes,
-  std::string techConfigFile
+  std::string techConfigFile,
+  std::string solutionFile
 ) {
   return std::make_unique<CombinedOptimization>(
     reportFile,
@@ -82,6 +93,7 @@ std::unique_ptr<Pass> streamhls::createCombinedOptimizationPass(
     DSPs,
     tilingLimit,
     timeLimitMinutes,
-    techConfigFile
+    techConfigFile,
+    solutionFile
   );
 }

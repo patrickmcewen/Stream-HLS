@@ -173,7 +173,9 @@ def CombinedOptimization : Pass<"streamhls-combined-optimization", "func::FuncOp
     Option<"timeLimitMinutes", "time-limit-minutes", "uint",
           /*default*/"1440", "MINLP solver time limit in seconds">,
     Option<"techConfigFile", "tech-config", "std::string",
-          /*default=*/"\"\"", "Path to JSON file with technology-specific latency and DSP values">
+          /*default=*/"\"\"", "Path to JSON file with technology-specific latency and DSP values">,
+    Option<"solutionFile", "solution-file", "std::string",
+          /*default=*/"\"\"", "Path to JSON file with pre-computed solution to replay (skip GUROBI solve)">
   ];
   let dependentDialects = ["mlir::streamhls::dataflow::DataflowDialect"];
 }

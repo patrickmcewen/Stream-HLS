@@ -75,6 +75,9 @@ struct StreamHLSKernelPipelineOptions
   Option<std::string> techConfigFile{
       *this, "tech-config", llvm::cl::init(""),
       llvm::cl::desc("Path to JSON file with technology-specific latency and DSP values")};
+  Option<std::string> solutionFile{
+      *this, "solution-file", llvm::cl::init(""),
+      llvm::cl::desc("Path to JSON file with pre-computed solution to replay (skip GUROBI solve)")};
 };
 } // namespace
 
@@ -175,7 +178,8 @@ void streamhls::registerStreamHLSKernelPipeline() {
             opts.DSPs,
             opts.tilingLimit,
             opts.timeLimitMinutes,
-            opts.techConfigFile
+            opts.techConfigFile,
+            opts.solutionFile
           ));
           pm.addPass(mlir::affine::createAffineLoopNormalizePass());
           pm.addPass(mlir::createCanonicalizerPass());

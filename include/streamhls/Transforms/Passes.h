@@ -82,7 +82,8 @@ std::unique_ptr<Pass> createCombinedOptimizationPass(
   uint DSPs = 512,
   uint tilingLimit = 8,
   uint timeLimitMinutes = 1440,
-  std::string techConfigFile = ""
+  std::string techConfigFile = "",
+  std::string solutionFile = ""
 );
 
 std::unique_ptr<Pass> createMinimalBufferSizesPass();

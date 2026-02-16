@@ -19,6 +19,8 @@
 #include "streamhls/Support/Utils.h"
 #include "streamhls/Support/TechConfig.h"
 #include "mlir/Dialect/Math/IR/Math.h"
+#include "llvm/Support/JSON.h"
+#include "llvm/Support/MemoryBuffer.h"
 // #include "gurobi_c++.h"
 
 using namespace mlir;
@@ -3975,6 +3977,142 @@ bool DFG::callCombinedOptimizationSolver(std::string filePath){
   //     llvm::dbgs() << "Node: " << nodePair.second.optPermutation.size() << "\n";
   //   );
   // }
+  return true;
+}
+
+bool DFG::saveSolutionToFile(std::string filePath){
+  llvm::json::Object root;
+
+  // Save permutation choices
+  llvm::json::Object permutations;
+  for(auto& nodePair : nodes){
+    auto& node = nodePair.second;
+    if(node.id == 10000) continue;
+    permutations[std::to_string(node.id)] = node.minPermIdx;
+  }
+  root["permutations"] = llvm::json::Value(std::move(permutations));
+
+  // Save tiling factors
+  llvm::json::Object tilingFactorsObj;
+  for(auto& nodePair : nodes){
+    auto& node = nodePair.second;
+    if(node.id == 10000) continue;
+    llvm::json::Array factors;
+    for(auto f : node.tilingFactors){
+      factors.push_back(static_cast<int64_t>(f));
+    }
+    tilingFactorsObj[std::to_string(node.id)] = llvm::json::Value(std::move(factors));
+  }
+  root["tiling_factors"] = llvm::json::Value(std::move(tilingFactorsObj));
+
+  // Write to file
+  std::error_code ec;
+  llvm::raw_fd_ostream outFile(filePath, ec);
+  if(ec){
+    llvm::errs() << "Failed to open solution file for writing: " << filePath << "\n";
+    return false;
+  }
+  outFile << llvm::formatv("{0:2}", llvm::json::Value(std::move(root)));
+  outFile.close();
+  llvm::dbgs() << "Saved solution to: " << filePath << "\n";
+  return true;
+}
+
+bool DFG::loadSolutionFromFile(std::string filePath){
+  // Initialize node info (enumerates permutations) and create root node,
+  // same as createCombinedOptimizationPerformanceModel does before solving
+  if(failed(populateNodeInfo(true))){
+    return false;
+  }
+  createRootNode();
+
+  // Read the JSON file
+  auto bufferOrErr = llvm::MemoryBuffer::getFile(filePath);
+  if(!bufferOrErr){
+    llvm::errs() << "Failed to open solution file: " << filePath << "\n";
+    return false;
+  }
+  auto parsed = llvm::json::parse((*bufferOrErr)->getBuffer());
+  if(!parsed){
+    llvm::errs() << "Failed to parse solution JSON: " << filePath << "\n";
+    return false;
+  }
+  auto *root = parsed->getAsObject();
+  if(!root){
+    llvm::errs() << "Solution JSON root is not an object\n";
+    return false;
+  }
+
+  // Load permutation choices
+  auto *permutations = root->getObject("permutations");
+  if(!permutations){
+    llvm::errs() << "Solution JSON missing 'permutations' key\n";
+    return false;
+  }
+  for(auto& nodePair : nodes){
+    auto& node = nodePair.second;
+    if(node.id == 10000) continue;
+    auto key = std::to_string(node.id);
+    auto val = permutations->getInteger(key);
+    if(!val){
+      llvm::errs() << "Missing permutation for node " << key << "\n";
+      return false;
+    }
+    node.minPermIdx = *val;
+    llvm::dbgs() << "Loaded permutation for node " << key << ": " << node.minPermIdx << "\n";
+  }
+
+  // Load tiling factors
+  auto *tilingFactorsObj = root->getObject("tiling_factors");
+  if(!tilingFactorsObj){
+    llvm::errs() << "Solution JSON missing 'tiling_factors' key\n";
+    return false;
+  }
+  for(auto& nodePair : nodes){
+    auto& node = nodePair.second;
+    if(node.id == 10000) continue;
+    if(!node.op) continue;
+    auto key = std::to_string(node.id);
+    auto *factorsArr = tilingFactorsObj->getArray(key);
+    if(!factorsArr){
+      llvm::errs() << "Missing tiling factors for node " << key << "\n";
+      return false;
+    }
+    if(auto forOp = dyn_cast<AffineForOp>(node.op)){
+      AffineLoopBand band;
+      getLoopBandFromOutermost(forOp, band);
+      node.tilingFactors.resize(band.size());
+      if(factorsArr->size() != band.size()){
+        llvm::errs() << "Tiling factors size mismatch for node " << key
+                     << ": expected " << band.size() << " got " << factorsArr->size() << "\n";
+        return false;
+      }
+      for(unsigned i = 0; i < band.size(); i++){
+        auto val = (*factorsArr)[i].getAsInteger();
+        if(!val){
+          llvm::errs() << "Invalid tiling factor for node " << key << " dim " << i << "\n";
+          return false;
+        }
+        node.tilingFactors[i] = *val;
+
+        // Validate divisibility: tiling factor must divide the loop bound
+        auto ub = band[i].getConstantUpperBound();
+        if(ub % node.tilingFactors[i] != 0){
+          llvm::errs() << "WARNING: tiling factor " << node.tilingFactors[i]
+                       << " does not divide loop bound " << ub
+                       << " for node " << key << " dim " << i << "\n";
+        }
+      }
+      llvm::dbgs() << "Loaded tiling factors for node " << key << ": [";
+      for(unsigned i = 0; i < node.tilingFactors.size(); i++){
+        llvm::dbgs() << node.tilingFactors[i];
+        if(i < node.tilingFactors.size() - 1) llvm::dbgs() << ", ";
+      }
+      llvm::dbgs() << "]\n";
+    }
+  }
+
+  llvm::dbgs() << "Successfully loaded solution from: " << filePath << "\n";
   return true;
 }
 

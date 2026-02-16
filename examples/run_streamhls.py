@@ -14,6 +14,7 @@ parser.add_argument('--tilelimit', type=int, default=10, help='Tile limit')
 parser.add_argument('--timelimit', type=int, default=20, help='Time limit')
 parser.add_argument('--bufferize', type=int, default=0, help='Bufferize function arguments')
 parser.add_argument('--tech-config', type=str, default='', help='Path to technology config JSON file')
+parser.add_argument('--solution-file', type=str, default='', help='Path to JSON file with pre-computed solution to replay')
 args = parser.parse_args()
 
 
@@ -58,6 +59,8 @@ outDir=f'designs/{benchmark}/opt{opt}/{kernel}_{dsps}' if args.outdir == "design
 print(f"outDir: {outDir}")
 
 tech_config_arg = f'--tech-config={tech_config}' if tech_config else ''
+solution_file = getattr(args, 'solution_file', '')
+solution_file_arg = f'--solution-file={solution_file}' if solution_file else ''
 cmd = f'python streamhls_pipeline.py \
   --prjsdir={outDir} \
   --bench={benchmark} \
@@ -72,6 +75,7 @@ cmd = f'python streamhls_pipeline.py \
   --minimize-on-chip-buffers={minimize_on_chip_buffers}\
   --debug={dbg_point}\
   --compile_only={compile_only} \
-  {tech_config_arg}'
+  {tech_config_arg} \
+  {solution_file_arg}'
 os.system(cmd)
 print(f'Finished {kernel}...')

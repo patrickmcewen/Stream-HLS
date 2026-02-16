@@ -36,6 +36,7 @@ parser.add_argument('--conv', type=int, required=False, default=0)
 parser.add_argument('--minimize-on-chip-buffers', type=int, required=False, default=0)
 parser.add_argument('--compile_only', type=int, required=False, default=0)
 parser.add_argument('--tech-config', type=str, required=False, default='', help='Path to technology config JSON file')
+parser.add_argument('--solution-file', type=str, required=False, default='', help='Path to JSON file with pre-computed solution to replay (skip GUROBI solve)')
 
 args = parser.parse_args()
 print("prjsdir: ", args.prjsdir)
@@ -58,6 +59,7 @@ conv = args.conv
 minimize_on_chip_buffers = args.minimize_on_chip_buffers
 compile_only = args.compile_only
 tech_config = args.tech_config
+solution_file = getattr(args, 'solution_file', '')
 
 config = {
   "Model": model,
@@ -139,6 +141,7 @@ if compile_only == 0:
 
   # kernel pipeline
   tech_config_opt = f'tech-config={tech_config}' if tech_config else ''
+  solution_file_opt = f'solution-file={solution_file}' if solution_file else ''
   cmd = f'streamhls-opt {prj_path}/mlir/input/{model}.mlir \
     -streamhls-kernel-pipeline="top-func=forward \
       graph-file={prj_path}/mlir/graphs/graph\
@@ -153,6 +156,7 @@ if compile_only == 0:
       optimize-conv-reuse={conv} \
       minimize-on-chip-buffers={minimize_on_chip_buffers} \
       {tech_config_opt} \
+      {solution_file_opt} \
       debug-point={debug}" \
     > {prj_path}/mlir/kernel/{model}.mlir'
   run_command(cmd)

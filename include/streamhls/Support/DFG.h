@@ -299,6 +299,10 @@ public:
 
   bool callCombinedOptimizationSolver(std::string fileName);
 
+  bool saveSolutionToFile(std::string filePath);
+
+  bool loadSolutionFromFile(std::string filePath);
+
   bool applyNodePermutations(PermutationType type = Minimize);
 
   bool applyNodeParallelization();
