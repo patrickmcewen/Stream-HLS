@@ -1389,8 +1389,8 @@ void ModuleEmitter::emitTensorEmpty(tensor::EmptyOp op) {
     auto shape = rankedType.getShape();
     if(auto elementType = dyn_cast<dataflow::StreamType>(rankedType.getElementType())) {
       emitValue(op.getResult());
-      auto depth = elementType.getDepth();
-      os << " depth=" << depth;
+      //auto depth = elementType.getDepth();
+      //os << " depth=" << depth;
     } else {
       emitError(op, "unsupported tensor element type.");
     }
@@ -2073,9 +2073,9 @@ void ModuleEmitter::emitArrayDirectives(Value memref) {
       indent();
       os << "#pragma HLS stream variable=";
       emitValue(memref);
-      os << " depth=";
-      int semicolon_index = attr_str.find(";");
-      os << attr_str.substr(7, semicolon_index - 7);
+      //os << " depth=";
+      //int semicolon_index = attr_str.find(";");
+      //os << attr_str.substr(7, semicolon_index - 7);
       os << "\n";
       // if the array is a FIFO, then it cannot be further partitioned
       // so directly return
@@ -2506,7 +2506,7 @@ void ModuleEmitter::emitStreamChannel(dataflow::StreamOp op) {
   os << "(\"fifo_" << fifoCounter++ << "\");\n";
   os << "\t#pragma HLS STREAM variable=";
   emitValue(op.getChannel());
-  os << " depth=" << op.getDepth();
+  //os << " depth=" << op.getDepth();
   emitInfoAndNewLine(op);
 }
 
@@ -2540,8 +2540,8 @@ void ModuleEmitter::emitArrayOfStreams(dataflow::ArrayOfStreamsOp op) {
     auto shape = rankedType.getShape();
     if(auto elementType = dyn_cast<dataflow::StreamType>(rankedType.getElementType())) {
       emitValue(op.getResult());
-      auto depth = elementType.getDepth();
-      os << " depth=" << depth;
+      //auto depth = elementType.getDepth();
+      //os << " depth=" << depth;
     } else {
       emitError(op, "unsupported tensor element type.");
     }

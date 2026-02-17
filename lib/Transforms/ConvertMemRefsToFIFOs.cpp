@@ -39,9 +39,9 @@ namespace{
     auto memrefType = allocOp.getMemref().getType().getElementType();
     auto memrefShape = allocOp.getMemref().getType().cast<MemRefType>().getShape();
     auto memrefSize = 1;
-    //for(auto dim : memrefShape){
-    //  memrefSize *= dim;
-    //}
+    for(auto dim : memrefShape){
+      memrefSize *= dim;
+    }
     auto loc = rewriter.getUnknownLoc();
     // create fifo
     rewriter.setInsertionPoint(allocOp);
@@ -131,9 +131,9 @@ namespace{
     auto memrefType = allocOp.getMemref().getType().getElementType();
     auto memrefShape = allocOp.getMemref().getType().cast<MemRefType>().getShape();
     auto memrefSize = 1;
-    //for(auto dim : memrefShape){
-    //  memrefSize *= dim;
-    //}
+    for(auto dim : memrefShape){
+      memrefSize *= dim;
+    }
     AffineForOp storeOpFor = storeOp->getParentOfType<AffineForOp>();
     AffineLoopBand storeOpBand;
     getLoopBandFromInnermost(storeOpFor, storeOpBand);
