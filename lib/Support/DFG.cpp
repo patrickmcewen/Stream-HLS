@@ -541,6 +541,9 @@ bool DFG::init(bool mergeAllocNodes) {
 
 // Merge node 'srcId' into node 'dstId' by moving all edges from 'srcId' to
 Node *DFG::mergeNodes(unsigned srcId, unsigned dstId) {
+  // Guard against self-merge (can happen after edge remapping)
+  if (srcId == dstId)
+    return getNode(dstId);
   // Move all edges from 'srcId' to 'dstId'.
   SmallVector<memref::AllocOp, 2> allocOps;
   if (outEdges.count(srcId) > 0) {
