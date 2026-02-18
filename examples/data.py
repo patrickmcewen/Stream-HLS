@@ -414,6 +414,621 @@ model_configs = {
         randTensor(1, 64, 128, dtype=dtype),
       )
     },
+    "FeedForward" : {
+      "class": "FeedForward",
+      "config" : dict(
+        embed_dim=128,
+        ff_dim=256
+      ),
+      "input" : (
+        randTensor(1, 512, 128, dtype=dtype),
+      )
+    },
+    "LlamaAttention" : {
+      "class": "LlamaAttention",
+      "config" : dict(
+        dim=256,
+        n_heads=4
+      ),
+      "input" : (
+        randTensor(1, 64, 256, dtype=dtype),
+      )
+    },
+    "LlamaFeedForward" : {
+      "class": "LlamaFeedForward",
+      "config" : dict(
+        dim=256,
+        ffn_dim=1024
+      ),
+      "input" : (
+        randTensor(1, 64, 256, dtype=dtype),
+      )
+    },
+    "LlamaPrefillAttention" : {
+      "class": "LlamaPrefillAttention",
+      "config" : dict(
+        dim=256,
+        n_heads=4
+      ),
+      "input" : (
+        randTensor(1, 64, 256, dtype=dtype),
+      )
+    },
+    "LlamaDecodeAttention" : {
+      "class": "LlamaDecodeAttention",
+      "config" : dict(
+        dim=256,
+        n_heads=4,
+        cache_len=64
+      ),
+      "input" : (
+        randTensor(1, 1, 256, dtype=dtype),            # x: single token
+        randTensor(1, 4, 64, 64, dtype=dtype),          # k_cache
+        randTensor(1, 4, 64, 64, dtype=dtype),          # v_cache
+      )
+    },
+    "LlamaDecodeFeedForward" : {
+      "class": "LlamaDecodeFeedForward",
+      "config" : dict(
+        dim=256,
+        ffn_dim=1024
+      ),
+      "input" : (
+        randTensor(1, 1, 256, dtype=dtype),
+      )
+    },
+    # ---------------------------------------------------------------------------
+    # Mixtral 8x7B sub-blocks (hidden=4096, GQA 32/8 heads, top-2 MoE)
+    # ---------------------------------------------------------------------------
+    "MixtralPrefillAttention" : {
+      "class": "MixtralPrefillAttention",
+      "config" : dict(
+        hidden=4096,
+        n_heads=32,
+        n_kv_heads=8,
+        head_dim=128
+      ),
+      "input" : (
+        randTensor(1, 512, 4096, dtype=dtype),
+      )
+    },
+    "MixtralPrefillMoE" : {
+      "class": "MixtralPrefillMoE",
+      "config" : dict(
+        hidden=4096,
+        ffn_intermediate=14336,
+        n_experts=8,
+        top_k=2
+      ),
+      "input" : (
+        randTensor(1, 512, 4096, dtype=dtype),
+      )
+    },
+    "MixtralDecodeAttention" : {
+      "class": "MixtralDecodeAttention",
+      "config" : dict(
+        hidden=4096,
+        n_heads=32,
+        n_kv_heads=8,
+        head_dim=128,
+        cache_len=512
+      ),
+      "input" : (
+        randTensor(1, 1, 4096, dtype=dtype),           # x: new token
+        randTensor(1, 8, 512, 128, dtype=dtype),        # k_cache
+        randTensor(1, 8, 512, 128, dtype=dtype),        # v_cache
+      )
+    },
+    "MixtralDecodeMoE" : {
+      "class": "MixtralDecodeMoE",
+      "config" : dict(
+        hidden=4096,
+        ffn_intermediate=14336,
+        n_experts=8,
+        top_k=2
+      ),
+      "input" : (
+        randTensor(1, 1, 4096, dtype=dtype),
+      )
+    },
+    # ---------------------------------------------------------------------------
+    # DeepSeek-V3 sub-blocks (hidden=7168, MLA attention, dense + MoE FFN)
+    # ---------------------------------------------------------------------------
+    "DeepSeekPrefillAttention" : {
+      "class": "DeepSeekPrefillAttention",
+      "config" : dict(
+        hidden=7168,
+        n_heads=128,
+        head_dim=128,
+        q_lora_rank=1536,
+        kv_lora_rank=512
+      ),
+      "input" : (
+        randTensor(1, 512, 7168, dtype=dtype),
+      )
+    },
+    "DeepSeekPrefillDenseFFN" : {
+      "class": "DeepSeekPrefillDenseFFN",
+      "config" : dict(
+        hidden=7168,
+        ffn_intermediate=18432
+      ),
+      "input" : (
+        randTensor(1, 512, 7168, dtype=dtype),
+      )
+    },
+    "DeepSeekPrefillMoE" : {
+      "class": "DeepSeekPrefillMoE",
+      "config" : dict(
+        hidden=7168,
+        moe_intermediate=2048,
+        n_routed_experts=256,
+        top_k=8
+      ),
+      "input" : (
+        randTensor(1, 512, 7168, dtype=dtype),
+      )
+    },
+    "DeepSeekDecodeAttention" : {
+      "class": "DeepSeekDecodeAttention",
+      "config" : dict(
+        hidden=7168,
+        n_heads=128,
+        head_dim=128,
+        q_lora_rank=1536,
+        kv_lora_rank=512,
+        cache_len=512
+      ),
+      "input" : (
+        randTensor(1, 1, 7168, dtype=dtype),              # x: new token
+        randTensor(1, 128, 512, 128, dtype=dtype),         # k_cache
+        randTensor(1, 128, 512, 128, dtype=dtype),         # v_cache
+      )
+    },
+    "DeepSeekDecodeDenseFFN" : {
+      "class": "DeepSeekDecodeDenseFFN",
+      "config" : dict(
+        hidden=7168,
+        ffn_intermediate=18432
+      ),
+      "input" : (
+        randTensor(1, 1, 7168, dtype=dtype),
+      )
+    },
+    "DeepSeekDecodeMoE" : {
+      "class": "DeepSeekDecodeMoE",
+      "config" : dict(
+        hidden=7168,
+        moe_intermediate=2048,
+        n_routed_experts=256,
+        top_k=8
+      ),
+      "input" : (
+        randTensor(1, 1, 7168, dtype=dtype),
+      )
+    },
+    # ---------------------------------------------------------------------------
+    # V-JEPA sub-blocks (ViT-H/16 encoder + narrow predictor)
+    # ---------------------------------------------------------------------------
+    "VJEPASpatialAttention" : {
+      "class": "VJEPASpatialAttention",
+      "config" : dict(
+        hidden=1280,
+        n_heads=16,
+        head_dim=80
+      ),
+      "input" : (
+        randTensor(16, 196, 1280, dtype=dtype),   # (n_frames, spatial_patches, hidden)
+      )
+    },
+    "VJEPATemporalAttention" : {
+      "class": "VJEPATemporalAttention",
+      "config" : dict(
+        hidden=1280,
+        n_heads=16,
+        head_dim=80
+      ),
+      "input" : (
+        randTensor(1, 3136, 1280, dtype=dtype),   # (batch, total_patches, hidden)
+      )
+    },
+    "VJEPAFeedForward" : {
+      "class": "VJEPAFeedForward",
+      "config" : dict(
+        hidden=1280,
+        ffn_intermediate=5120
+      ),
+      "input" : (
+        randTensor(1, 3136, 1280, dtype=dtype),
+      )
+    },
+    "VJEPAPredictorAttention" : {
+      "class": "VJEPAPredictorAttention",
+      "config" : dict(
+        pred_hidden=384,
+        n_heads=12,
+        head_dim=32
+      ),
+      "input" : (
+        randTensor(1, 3136, 384, dtype=dtype),    # (batch, pred_seq_len, pred_hidden)
+      )
+    },
+    "VJEPAPredictorFeedForward" : {
+      "class": "VJEPAPredictorFeedForward",
+      "config" : dict(
+        pred_hidden=384,
+        ffn_intermediate=1536
+      ),
+      "input" : (
+        randTensor(1, 3136, 384, dtype=dtype),
+      )
+    },
+    # ---------------------------------------------------------------------------
+    # OpenVLA sub-blocks (DINOv2 + SigLIP + vision projection + Llama2-7B LM)
+    # ---------------------------------------------------------------------------
+    "OpenVLADinoAttention" : {
+      "class": "OpenVLADinoAttention",
+      "config" : dict(
+        hidden=1024,
+        n_heads=16,
+        head_dim=64
+      ),
+      "input" : (
+        randTensor(1, 256, 1024, dtype=dtype),    # (batch, n_patches, dino_hidden)
+      )
+    },
+    "OpenVLADinoFeedForward" : {
+      "class": "OpenVLADinoFeedForward",
+      "config" : dict(
+        hidden=1024,
+        ffn_intermediate=4096
+      ),
+      "input" : (
+        randTensor(1, 256, 1024, dtype=dtype),
+      )
+    },
+    "OpenVLAVisionAttention" : {
+      "class": "OpenVLAVisionAttention",
+      "config" : dict(
+        hidden=1152,
+        n_heads=16,
+        head_dim=72
+      ),
+      "input" : (
+        randTensor(1, 256, 1152, dtype=dtype),    # (batch, n_patches, vis_hidden)
+      )
+    },
+    "OpenVLAVisionFeedForward" : {
+      "class": "OpenVLAVisionFeedForward",
+      "config" : dict(
+        hidden=1152,
+        ffn_intermediate=4304
+      ),
+      "input" : (
+        randTensor(1, 256, 1152, dtype=dtype),
+      )
+    },
+    "OpenVLAVisionProjection" : {
+      "class": "OpenVLAVisionProjection",
+      "config" : dict(
+        proj_in=2176,
+        lm_hidden=4096
+      ),
+      "input" : (
+        randTensor(1, 256, 2176, dtype=dtype),    # (batch, n_patches, dino+siglip concat)
+      )
+    },
+    "OpenVLALMPrefillAttention" : {
+      "class": "OpenVLALMPrefillAttention",
+      "config" : dict(
+        hidden=4096,
+        n_heads=32,
+        head_dim=128
+      ),
+      "input" : (
+        randTensor(1, 512, 4096, dtype=dtype),    # (batch, vision+lang tokens, lm_hidden)
+      )
+    },
+    "OpenVLALMFeedForward" : {
+      "class": "OpenVLALMFeedForward",
+      "config" : dict(
+        hidden=4096,
+        ffn_intermediate=11008
+      ),
+      "input" : (
+        randTensor(1, 512, 4096, dtype=dtype),
+      )
+    },
+    "OpenVLALMDecodeAttention" : {
+      "class": "OpenVLALMDecodeAttention",
+      "config" : dict(
+        hidden=4096,
+        n_heads=32,
+        head_dim=128,
+        cache_len=512
+      ),
+      "input" : (
+        randTensor(1, 1, 4096, dtype=dtype),              # x: new action token
+        randTensor(1, 32, 512, 128, dtype=dtype),          # k_cache
+        randTensor(1, 32, 512, 128, dtype=dtype),          # v_cache
+      )
+    },
+    # ---------------------------------------------------------------------------
+    # DeepSeek-V3 SMALL sub-blocks (hidden=512, prompt_len=64, cache_len=64)
+    # ---------------------------------------------------------------------------
+    "DeepSeekPrefillAttentionSmall" : {
+      "class": "DeepSeekPrefillAttention",
+      "config" : dict(
+        hidden=512,
+        n_heads=8,
+        head_dim=64,
+        q_lora_rank=128,
+        kv_lora_rank=64
+      ),
+      "input" : (
+        randTensor(1, 64, 512, dtype=dtype),
+      )
+    },
+    "DeepSeekPrefillDenseFFNSmall" : {
+      "class": "DeepSeekPrefillDenseFFN",
+      "config" : dict(
+        hidden=512,
+        ffn_intermediate=1024
+      ),
+      "input" : (
+        randTensor(1, 64, 512, dtype=dtype),
+      )
+    },
+    "DeepSeekPrefillMoESmall" : {
+      "class": "DeepSeekPrefillMoE",
+      "config" : dict(
+        hidden=512,
+        moe_intermediate=256,
+        n_routed_experts=16,
+        top_k=2
+      ),
+      "input" : (
+        randTensor(1, 64, 512, dtype=dtype),
+      )
+    },
+    "DeepSeekDecodeAttentionSmall" : {
+      "class": "DeepSeekDecodeAttention",
+      "config" : dict(
+        hidden=512,
+        n_heads=8,
+        head_dim=64,
+        q_lora_rank=128,
+        kv_lora_rank=64,
+        cache_len=64
+      ),
+      "input" : (
+        randTensor(1, 1, 512, dtype=dtype),               # x: new token
+        randTensor(1, 8, 64, 64, dtype=dtype),             # k_cache
+        randTensor(1, 8, 64, 64, dtype=dtype),             # v_cache
+      )
+    },
+    "DeepSeekDecodeDenseFFNSmall" : {
+      "class": "DeepSeekDecodeDenseFFN",
+      "config" : dict(
+        hidden=512,
+        ffn_intermediate=1024
+      ),
+      "input" : (
+        randTensor(1, 1, 512, dtype=dtype),
+      )
+    },
+    "DeepSeekDecodeMoESmall" : {
+      "class": "DeepSeekDecodeMoE",
+      "config" : dict(
+        hidden=512,
+        moe_intermediate=256,
+        n_routed_experts=16,
+        top_k=2
+      ),
+      "input" : (
+        randTensor(1, 1, 512, dtype=dtype),
+      )
+    },
+    # ---------------------------------------------------------------------------
+    # Mixtral SMALL sub-blocks (hidden=512, n_kv_heads=2, prompt_len=64)
+    # ---------------------------------------------------------------------------
+    "MixtralPrefillAttentionSmall" : {
+      "class": "MixtralPrefillAttention",
+      "config" : dict(
+        hidden=512,
+        n_heads=8,
+        n_kv_heads=2,
+        head_dim=64
+      ),
+      "input" : (
+        randTensor(1, 64, 512, dtype=dtype),
+      )
+    },
+    "MixtralPrefillMoESmall" : {
+      "class": "MixtralPrefillMoE",
+      "config" : dict(
+        hidden=512,
+        ffn_intermediate=1024,
+        n_experts=4,
+        top_k=2
+      ),
+      "input" : (
+        randTensor(1, 64, 512, dtype=dtype),
+      )
+    },
+    "MixtralDecodeAttentionSmall" : {
+      "class": "MixtralDecodeAttention",
+      "config" : dict(
+        hidden=512,
+        n_heads=8,
+        n_kv_heads=2,
+        head_dim=64,
+        cache_len=64
+      ),
+      "input" : (
+        randTensor(1, 1, 512, dtype=dtype),               # x: new token
+        randTensor(1, 2, 64, 64, dtype=dtype),             # k_cache
+        randTensor(1, 2, 64, 64, dtype=dtype),             # v_cache
+      )
+    },
+    "MixtralDecodeMoESmall" : {
+      "class": "MixtralDecodeMoE",
+      "config" : dict(
+        hidden=512,
+        ffn_intermediate=1024,
+        n_experts=4,
+        top_k=2
+      ),
+      "input" : (
+        randTensor(1, 1, 512, dtype=dtype),
+      )
+    },
+    # ---------------------------------------------------------------------------
+    # V-JEPA SMALL sub-blocks (hidden=256, n_frames=4 → 784 total patches)
+    # ---------------------------------------------------------------------------
+    "VJEPASpatialAttentionSmall" : {
+      "class": "VJEPASpatialAttention",
+      "config" : dict(
+        hidden=256,
+        n_heads=4,
+        head_dim=64
+      ),
+      "input" : (
+        randTensor(4, 196, 256, dtype=dtype),   # (n_frames, spatial_patches, hidden)
+      )
+    },
+    "VJEPATemporalAttentionSmall" : {
+      "class": "VJEPATemporalAttention",
+      "config" : dict(
+        hidden=256,
+        n_heads=4,
+        head_dim=64
+      ),
+      "input" : (
+        randTensor(1, 784, 256, dtype=dtype),   # (batch, n_frames*spatial_patches, hidden)
+      )
+    },
+    "VJEPAFeedForwardSmall" : {
+      "class": "VJEPAFeedForward",
+      "config" : dict(
+        hidden=256,
+        ffn_intermediate=1024
+      ),
+      "input" : (
+        randTensor(1, 784, 256, dtype=dtype),
+      )
+    },
+    "VJEPAPredictorAttentionSmall" : {
+      "class": "VJEPAPredictorAttention",
+      "config" : dict(
+        pred_hidden=128,
+        n_heads=4,
+        head_dim=32
+      ),
+      "input" : (
+        randTensor(1, 784, 128, dtype=dtype),   # (batch, pred_seq_len, pred_hidden)
+      )
+    },
+    "VJEPAPredictorFeedForwardSmall" : {
+      "class": "VJEPAPredictorFeedForward",
+      "config" : dict(
+        pred_hidden=128,
+        ffn_intermediate=512
+      ),
+      "input" : (
+        randTensor(1, 784, 128, dtype=dtype),
+      )
+    },
+    # ---------------------------------------------------------------------------
+    # OpenVLA SMALL sub-blocks (dino/vis=256, lm=512, n_patches=64)
+    # ---------------------------------------------------------------------------
+    "OpenVLADinoAttentionSmall" : {
+      "class": "OpenVLADinoAttention",
+      "config" : dict(
+        hidden=256,
+        n_heads=4,
+        head_dim=64
+      ),
+      "input" : (
+        randTensor(1, 64, 256, dtype=dtype),    # (batch, n_patches, dino_hidden)
+      )
+    },
+    "OpenVLADinoFeedForwardSmall" : {
+      "class": "OpenVLADinoFeedForward",
+      "config" : dict(
+        hidden=256,
+        ffn_intermediate=1024
+      ),
+      "input" : (
+        randTensor(1, 64, 256, dtype=dtype),
+      )
+    },
+    "OpenVLAVisionAttentionSmall" : {
+      "class": "OpenVLAVisionAttention",
+      "config" : dict(
+        hidden=256,
+        n_heads=4,
+        head_dim=64
+      ),
+      "input" : (
+        randTensor(1, 64, 256, dtype=dtype),    # (batch, n_patches, vis_hidden)
+      )
+    },
+    "OpenVLAVisionFeedForwardSmall" : {
+      "class": "OpenVLAVisionFeedForward",
+      "config" : dict(
+        hidden=256,
+        ffn_intermediate=1024
+      ),
+      "input" : (
+        randTensor(1, 64, 256, dtype=dtype),
+      )
+    },
+    "OpenVLAVisionProjectionSmall" : {
+      "class": "OpenVLAVisionProjection",
+      "config" : dict(
+        proj_in=512,
+        lm_hidden=512
+      ),
+      "input" : (
+        randTensor(1, 64, 512, dtype=dtype),    # (batch, n_patches, dino+siglip concat)
+      )
+    },
+    "OpenVLALMPrefillAttentionSmall" : {
+      "class": "OpenVLALMPrefillAttention",
+      "config" : dict(
+        hidden=512,
+        n_heads=8,
+        head_dim=64
+      ),
+      "input" : (
+        randTensor(1, 128, 512, dtype=dtype),   # (batch, vision+lang tokens, lm_hidden)
+      )
+    },
+    "OpenVLALMFeedForwardSmall" : {
+      "class": "OpenVLALMFeedForward",
+      "config" : dict(
+        hidden=512,
+        ffn_intermediate=2048
+      ),
+      "input" : (
+        randTensor(1, 128, 512, dtype=dtype),
+      )
+    },
+    "OpenVLALMDecodeAttentionSmall" : {
+      "class": "OpenVLALMDecodeAttention",
+      "config" : dict(
+        hidden=512,
+        n_heads=8,
+        head_dim=64,
+        cache_len=128
+      ),
+      "input" : (
+        randTensor(1, 1, 512, dtype=dtype),               # x: new action token
+        randTensor(1, 8, 128, 64, dtype=dtype),            # k_cache
+        randTensor(1, 8, 128, 64, dtype=dtype),            # v_cache
+      )
+    },
     "mobilenet" : {
       "class": "MobileNet",
       "config" : {},
