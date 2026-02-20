@@ -3787,15 +3787,15 @@ bool DFG::callParallelizationSolver(std::string filePath){
   while (std::getline(iss, line)) {
     if(std::regex_search(line, match, pattern)){
       auto key = match.str(1);
-      auto val = std::stoi(match.str(2));
+      auto val = std::stoull(match.str(2));
       solution[key] = val;
     }
     if(std::regex_search(line, match, latencyPattern)){
-      auto latency = std::stoi(match.str(1));
+      auto latency = std::stoll(match.str(1));
       llvm::dbgs() << "Parallel Latency: " << latency << "\n";
     }
     if(std::regex_search(line, match, totalDSPsPattern)){
-      auto totalDSPs = std::stoi(match.str(1));
+      auto totalDSPs = std::stoll(match.str(1));
       llvm::dbgs() << "Total DSPs: " << totalDSPs << "\n";
     }
   }
@@ -4113,6 +4113,10 @@ static bool applyArrayPartition(Value array, SmallVector<unsigned> &factors,
   if (!arrayType || !arrayType.hasStaticShape()){
     return false;
   }
+
+  // Cannot partition a scalar (0-dim) memref.
+  if (arrayType.getRank() == 0)
+    return false;
 
   if(((int64_t)factors.size() == (arrayType.getRank()-1) || (int64_t)kinds.size() != (arrayType.getRank()-1)) &&
       arrayType.getShape()[0] == 1

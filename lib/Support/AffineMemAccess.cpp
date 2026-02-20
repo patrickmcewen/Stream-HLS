@@ -780,12 +780,25 @@ std::string streamhls::getVariableTimeFunction(unsigned nodeId, const SmallVecto
   for(size_t idx = 0; idx < loopsInfo.size(); idx++){
     auto currIV = loopsInfo[idx].value;
     std::stringstream currUB;
-    currUB << "x" << nodeId << "_" << permutation[loopsInfo.size() - idx - 1];
+    // loopsInfo may be deeper than permutation when a load/store is enclosed
+    // by outer loops not part of the node's optimization band (e.g. from GQA
+    // broadcast expand ops).  Use the actual trip count for those extra loops.
+    size_t permPos = loopsInfo.size() - idx - 1;
+    if(permPos < permutation.size()){
+      currUB << "x" << nodeId << "_" << permutation[permPos];
+    } else {
+      currUB << loopsInfo[idx].tripCount;
+    }
     std::stringstream prevTripCount;
     // prevTripCount << "";
     // auto prevUB = 0;
     if(idx > 0){
-      prevTripCount << "x" << nodeId << "_" << permutation[loopsInfo.size() - (idx-1) - 1];
+      size_t prevPermPos = loopsInfo.size() - idx;  // = loopsInfo.size() - (idx-1) - 1
+      if(prevPermPos < permutation.size()){
+        prevTripCount << "x" << nodeId << "_" << permutation[prevPermPos];
+      } else {
+        prevTripCount << loopsInfo[idx-1].tripCount;
+      }
       // prevUB = loopsInfo[idx-1].ub;
     }else{
       prevTripCount << 1;
@@ -1317,6 +1330,11 @@ AffineMap streamhls::getMinimalAccessPattern(Operation *op){
     }
   }
 
+  // Guard: scalar/broadcast access with no loop-dependent indices.
+  if(orderingIndices2.empty()){
+    return AffineMap::get(0, 0, {}, op->getContext());
+  }
+
   auto map2 = AffineMap::getPermutationMap(orderingIndices2, op->getContext());
 
   auto outMap = accessMap.compose(map2);
@@ -1353,8 +1371,13 @@ AffineMap streamhls::getMinimalAccessPattern(Operation *op){
     // assert(false && "locations.size() != relevantOperands.size()");
   }
 
+  // Guard: access map has no dimension expressions — treat as scalar/broadcast.
+  if(locations.empty()){
+    return AffineMap::get(0, 0, {}, op->getContext());
+  }
+
   auto simplifiedMap = AffineMap::getPermutationMap(locations, op->getContext());
-  
+
   return simplifiedMap;
 }
 

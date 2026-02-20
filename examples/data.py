@@ -478,6 +478,56 @@ model_configs = {
       )
     },
     # ---------------------------------------------------------------------------
+    # LLaMA 3 8B sub-blocks (hidden=4096, GQA 32/8 heads, SwiGLU ffn=14336)
+    # ---------------------------------------------------------------------------
+    "Llama38BPrefillAttention" : {
+      "class": "Llama38BPrefillAttention",
+      "config" : dict(
+        hidden=4096,
+        n_heads=32,
+        n_kv_heads=8,
+        head_dim=128
+      ),
+      "input" : (
+        randTensor(1, 64, 4096, dtype=dtype),    # (batch, prompt_len, hidden)
+      )
+    },
+    "Llama38BDecodeAttention" : {
+      "class": "Llama38BDecodeAttention",
+      "config" : dict(
+        hidden=4096,
+        n_heads=32,
+        n_kv_heads=8,
+        head_dim=128,
+        cache_len=64
+      ),
+      "input" : (
+        randTensor(1, 1, 4096, dtype=dtype),           # x: new token
+        randTensor(1, 8, 64, 128, dtype=dtype),        # k_cache: (batch, n_kv_heads, cache_len, head_dim)
+        randTensor(1, 8, 64, 128, dtype=dtype),        # v_cache
+      )
+    },
+    "Llama38BPrefillFeedForward" : {
+      "class": "LlamaFeedForward",
+      "config" : dict(
+        dim=4096,
+        ffn_dim=14336
+      ),
+      "input" : (
+        randTensor(1, 64, 4096, dtype=dtype),
+      )
+    },
+    "Llama38BDecodeFeedForward" : {
+      "class": "LlamaDecodeFeedForward",
+      "config" : dict(
+        dim=4096,
+        ffn_dim=14336
+      ),
+      "input" : (
+        randTensor(1, 1, 4096, dtype=dtype),
+      )
+    },
+    # ---------------------------------------------------------------------------
     # Mixtral 8x7B sub-blocks (hidden=4096, GQA 32/8 heads, top-2 MoE)
     # ---------------------------------------------------------------------------
     "MixtralPrefillAttention" : {

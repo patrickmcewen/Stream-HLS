@@ -1930,9 +1930,14 @@ void ModuleEmitter::emitArrayDecl(Value array, bool isFunc, std::string name) {
         else
           emitValue(array, 0, false, name);
       } else {
-        emitValue(array, 0, false, name);
-        for (auto &shape : tensor.getShape())
-          os << "[" << shape << "]";
+        if (isFunc && tensor.getShape().empty()) {
+          // 0-dim tensor of stream: scalar stream, must be passed by reference.
+          emitValue(array, 0, false, name, true);
+        } else {
+          emitValue(array, 0, false, name);
+          for (auto &shape : tensor.getShape())
+            os << "[" << shape << "]";
+        }
       }
     } else { // tensor
       emitValue(array, 0, false, name);
