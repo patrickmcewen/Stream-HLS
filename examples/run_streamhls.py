@@ -13,6 +13,7 @@ parser.add_argument('--dsps', type=int, default=2560*3, help='Number of DSPs')
 parser.add_argument('--tilelimit', type=int, default=10, help='Tile limit')
 parser.add_argument('--timelimit', type=int, default=20, help='Time limit')
 parser.add_argument('--bufferize', type=int, default=0, help='Bufferize function arguments')
+parser.add_argument('--conv', type=int, default=1, help='Enable conv optimization in StreamHLS pipeline')
 parser.add_argument('--tech-config', type=str, default='', help='Path to technology config JSON file')
 args = parser.parse_args()
 
@@ -20,6 +21,7 @@ args = parser.parse_args()
 tilelimit=args.tilelimit
 timelimit=args.timelimit
 dsps=args.dsps
+conv=args.conv
 tech_config=args.tech_config
 # bufferize function arguments flag
 bufferize=args.bufferize
@@ -72,6 +74,7 @@ cmd = f'python streamhls_pipeline.py \
   --minimize-on-chip-buffers={minimize_on_chip_buffers}\
   --debug={dbg_point}\
   --compile_only={compile_only} \
+  --conv={conv} \
   {tech_config_arg}'
 os.system(cmd)
 print(f'Finished {kernel}...')

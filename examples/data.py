@@ -1029,6 +1029,95 @@ model_configs = {
         randTensor(1, 8, 128, 64, dtype=dtype),            # v_cache
       )
     },
+    # ---------------------------------------------------------------------------
+    # ResNet-18 sub-blocks (image classification, 224x224 input)
+    # Each BasicBlock is a separate entry so StreamHLS can optimize each
+    # individually (stacking two blocks exceeds the solver's capacity).
+    # ---------------------------------------------------------------------------
+    "ResNet18Stem" : {
+      "class": "ResNet18Stem",
+      "config" : {},
+      "input" : (
+        randTensor(1, 3, 230, 230, dtype=dtype),  # (batch, 3, 224, 224) but pre-padded
+      )
+    },
+    "ResNet18Layer1Block" : {
+      "class": "ResNet18Block",
+      "config" : dict(in_channels=64, out_channels=64, stride=1),
+      "input" : (
+        randTensor(1, 64, 60, 60, dtype=dtype),  
+        randTensor(1, 64, 56, 56, dtype=dtype), 
+      )
+    },
+    # Layer 2: first block (64→128, stride=2), second block (128→128)
+    "ResNet18Layer2Down" : {
+      "class": "ResNet18Block",
+      "config" : dict(in_channels=64, out_channels=128, stride=2),
+      "input" : (
+        randTensor(1, 64, 62, 62, dtype=dtype),  
+        randTensor(1, 64, 56, 56, dtype=dtype),  
+      )
+    },
+    "ResNet18Layer2Block" : {
+      "class": "ResNet18Block",
+      "config" : dict(in_channels=128, out_channels=128, stride=1),
+      "input" : (
+        randTensor(1, 128, 32, 32, dtype=dtype),  
+        randTensor(1, 128, 28, 28, dtype=dtype), 
+      )
+    },
+    # Layer 3: first block (128→256, stride=2), second block (256→256)
+    "ResNet18Layer3Down" : {
+      "class": "ResNet18Block",
+      "config" : dict(in_channels=128, out_channels=256, stride=2),
+      "input" : (
+        randTensor(1, 128, 34, 34, dtype=dtype), 
+        randTensor(1, 128, 28, 28, dtype=dtype), 
+      )
+    },
+    "ResNet18Layer3Block" : {
+      "class": "ResNet18Block",
+      "config" : dict(in_channels=256, out_channels=256, stride=1),
+      "input" : (
+        randTensor(1, 256, 18, 18, dtype=dtype),  
+        randTensor(1, 256, 14, 14, dtype=dtype),  
+      )
+    },
+    # Layer 4: first block (256→512, stride=2), second block (512→512)
+    "ResNet18Layer4Down" : {
+      "class": "ResNet18Block",
+      "config" : dict(in_channels=256, out_channels=512, stride=2),
+      "input" : (
+        randTensor(1, 256, 20, 20, dtype=dtype),  
+        randTensor(1, 256, 14, 14, dtype=dtype),   
+      )
+    },
+    "ResNet18Layer4Block" : {
+      "class": "ResNet18Block",
+      "config" : dict(in_channels=512, out_channels=512, stride=1),
+      "input" : (
+        randTensor(1, 512, 11, 11, dtype=dtype), 
+        randTensor(1, 512, 7, 7, dtype=dtype),    
+      )
+    },
+    "ResNet18Classifier" : {
+      "class": "ResNet18Classifier",
+      "config" : {},
+      "input" : (
+        randTensor(1, 512, 7, 7, dtype=dtype),   
+      )
+    },
+    "ResidualBlock" : {
+      "class": "ResidualBlock",
+      "config" : dict(
+        in_channels=16,
+        out_channels=16,
+        stride=1
+      ),
+      "input" : (
+        randTensor(1, 16, 58, 58, dtype=dtype),
+      )
+    },
     "mobilenet" : {
       "class": "MobileNet",
       "config" : {},
