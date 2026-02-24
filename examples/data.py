@@ -1154,7 +1154,89 @@ model_configs = {
       "class": "ResNet18Classifier",
       "config" : {},
       "input" : (
-        randTensor(1, 512, 7, 7, dtype=dtype),   
+        randTensor(1, 512, 7, 7, dtype=dtype),
+      )
+    },
+    # ---------------------------------------------------------------------------
+    # ResNet-50 sub-blocks (image classification, 224x224 input)
+    # Stem is reused from ResNet18Stem (same architecture).
+    # Each Bottleneck takes (x_padded, identity) where x_padded = F.pad(x,(1,1,1,1))
+    # so conv2 (3×3, no padding) produces the correct output size without generating
+    # tensor.pad ops inside the block (which crash StreamHLS affine loop passes).
+    # ---------------------------------------------------------------------------
+    # Layer 1: first block expands 64→256 (stride=1), then two plain blocks (256→256)
+    "ResNet50Layer1Down" : {
+      "class": "ResNet50Bottleneck",
+      "config" : dict(in_channels=64, bottleneck=64, out_channels=256, stride=1),
+      "input" : (
+        randTensor(1, 64, 58, 58, dtype=dtype),   # x pre-padded (56+2=58)
+        randTensor(1, 64, 56, 56, dtype=dtype),   # identity (unpadded)
+      )
+    },
+    "ResNet50Layer1Block" : {
+      "class": "ResNet50Bottleneck",
+      "config" : dict(in_channels=256, bottleneck=64, out_channels=256, stride=1),
+      "input" : (
+        randTensor(1, 256, 58, 58, dtype=dtype),  # x pre-padded (56+2=58)
+        randTensor(1, 256, 56, 56, dtype=dtype),  # identity (unpadded)
+      )
+    },
+    # Layer 2: first block downsizes (256→512, stride=2), then three plain (512→512)
+    "ResNet50Layer2Down" : {
+      "class": "ResNet50Bottleneck",
+      "config" : dict(in_channels=256, bottleneck=128, out_channels=512, stride=2),
+      "input" : (
+        randTensor(1, 256, 58, 58, dtype=dtype),  # x pre-padded (56+2=58)
+        randTensor(1, 256, 56, 56, dtype=dtype),  # identity (unpadded)
+      )
+    },
+    "ResNet50Layer2Block" : {
+      "class": "ResNet50Bottleneck",
+      "config" : dict(in_channels=512, bottleneck=128, out_channels=512, stride=1),
+      "input" : (
+        randTensor(1, 512, 30, 30, dtype=dtype),  # x pre-padded (28+2=30)
+        randTensor(1, 512, 28, 28, dtype=dtype),  # identity (unpadded)
+      )
+    },
+    # Layer 3: first block downsizes (512→1024, stride=2), then five plain (1024→1024)
+    "ResNet50Layer3Down" : {
+      "class": "ResNet50Bottleneck",
+      "config" : dict(in_channels=512, bottleneck=256, out_channels=1024, stride=2),
+      "input" : (
+        randTensor(1, 512, 30, 30, dtype=dtype),  # x pre-padded (28+2=30)
+        randTensor(1, 512, 28, 28, dtype=dtype),  # identity (unpadded)
+      )
+    },
+    "ResNet50Layer3Block" : {
+      "class": "ResNet50Bottleneck",
+      "config" : dict(in_channels=1024, bottleneck=256, out_channels=1024, stride=1),
+      "input" : (
+        randTensor(1, 1024, 16, 16, dtype=dtype), # x pre-padded (14+2=16)
+        randTensor(1, 1024, 14, 14, dtype=dtype), # identity (unpadded)
+      )
+    },
+    # Layer 4: first block downsizes (1024→2048, stride=2), then two plain (2048→2048)
+    "ResNet50Layer4Down" : {
+      "class": "ResNet50Bottleneck",
+      "config" : dict(in_channels=1024, bottleneck=512, out_channels=2048, stride=2),
+      "input" : (
+        randTensor(1, 1024, 16, 16, dtype=dtype), # x pre-padded (14+2=16)
+        randTensor(1, 1024, 14, 14, dtype=dtype), # identity (unpadded)
+      )
+    },
+    "ResNet50Layer4Block" : {
+      "class": "ResNet50Bottleneck",
+      "config" : dict(in_channels=2048, bottleneck=512, out_channels=2048, stride=1),
+      "input" : (
+        randTensor(1, 2048, 9, 9, dtype=dtype),   # x pre-padded (7+2=9)
+        randTensor(1, 2048, 7, 7, dtype=dtype),   # identity (unpadded)
+      )
+    },
+    "ResNet50Classifier" : {
+      "class": "ResNet50Classifier",
+      "config" : {},
+      "input" : (
+        randTensor(1, 2048, 7, 7, dtype=dtype),
       )
     },
     "ResidualBlock" : {
