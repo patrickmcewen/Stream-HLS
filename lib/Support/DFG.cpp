@@ -3889,7 +3889,7 @@ bool DFG::callCombinedOptimizationSolver(std::string filePath){
   while (std::getline(iss, line)) {
     if(std::regex_search(line, match, parallelizationPattern)){
       auto key = match.str(1);
-      auto val = std::stoi(match.str(2));
+      auto val = std::stoul(match.str(2));
       parallelizationSolution[key] = val;
     }
     if(std::regex_search(line, match, permutationPattern)){
@@ -3897,11 +3897,11 @@ bool DFG::callCombinedOptimizationSolver(std::string filePath){
       permutationSolution[key] = true;
     }
     if(std::regex_search(line, match, latencyPattern)){
-      auto latency = std::stoi(match.str(1));
+      auto latency = std::stol(match.str(1));
       llvm::dbgs() << "Combined Latency: " << latency << "\n";
     }
     if(std::regex_search(line, match, totalDSPsPattern)){
-      auto totalDSPs = std::stoi(match.str(1));
+      auto totalDSPs = std::stol(match.str(1));
       llvm::dbgs() << "Total DSPs: " << totalDSPs << "\n";
     }
   }
@@ -4021,7 +4021,7 @@ bool DFG::callPermutationSolver(std::string filePath, bool isMinimize){
       solution[key] = false;
     }
     if(std::regex_search(line, match, latencyPattern)){
-      auto latency = std::stoi(match.str().substr(10));
+      auto latency = std::stol(match.str().substr(10));
       llvm::dbgs() << "latency: " << latency << "\n";
     }
   }
