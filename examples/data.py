@@ -1496,6 +1496,15 @@ model_configs = {
         torch.randint(0, 256, (1800, 196), dtype=torch.int32),  # training_set
         torch.randint(0, 256, (50, 196), dtype=torch.int32)     # test_set
       )
+    },
+    "dot_prod" : {
+      "class": "gemm",
+      "config" : {},
+      "input" : (
+        randTensor(2, 200*220*120, dtype=dtype),   # a: (1, N) row vector except I have to use 2 or else the whole gemm gets optimized away
+        randTensor(200*220*120, 1, dtype=dtype),    # b: (N, 1) column vector
+        randTensor(2, 1, dtype=dtype)    # c:
+      )
     }
   }
 }
