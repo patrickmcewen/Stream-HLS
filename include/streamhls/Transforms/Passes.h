@@ -42,6 +42,7 @@ enum CreateSubviewMode { Point, Reduction };
 void registerTransformsPasses();
 void registerStreamHLSBaseKernelPipeline();
 void registerStreamHLSKernelPipeline();
+void registerStreamHLSCodesignPipeline();
 void registerStreamHLSHostPipeline();
 
 std::unique_ptr<Pass> createCreateDataflowFromAffinePass();
@@ -82,6 +83,15 @@ std::unique_ptr<Pass> createCombinedOptimizationPass(
   uint DSPs = 512,
   uint tilingLimit = 8,
   uint timeLimitMinutes = 1440,
+  std::string techConfigFile = ""
+);
+std::unique_ptr<Pass> createEmitTransformSpacePass(
+  std::string reportFile = "space",
+  uint tilingLimit = 8,
+  std::string techConfigFile = ""
+);
+std::unique_ptr<Pass> createApplyTransformSolutionPass(
+  std::string solutionFile = "solution.json",
   std::string techConfigFile = ""
 );
 

@@ -178,6 +178,32 @@ def CombinedOptimization : Pass<"streamhls-combined-optimization", "func::FuncOp
   let dependentDialects = ["mlir::streamhls::dataflow::DataflowDialect"];
 }
 
+def EmitTransformSpace : Pass<"streamhls-emit-transform-space", "func::FuncOp"> {
+  let summary = "Emit loop transform search space as JSON";
+  let constructor = "mlir::streamhls::createEmitTransformSpacePass()";
+  let options = [
+    Option<"reportFile", "outfile", "std::string",
+           /*default=*/"\"space\"", "Output file prefix">,
+    Option<"tilingLimit", "tiling-limit", "uint",
+            /*default=*/"8", "Limit of tiling factor">,
+    Option<"techConfigFile", "tech-config", "std::string",
+          /*default=*/"\"\"", "Path to JSON file with technology-specific latency and DSP values">
+  ];
+  let dependentDialects = ["mlir::streamhls::dataflow::DataflowDialect"];
+}
+
+def ApplyTransformSolution : Pass<"streamhls-apply-transform-solution", "func::FuncOp"> {
+  let summary = "Apply loop transform solution from JSON";
+  let constructor = "mlir::streamhls::createApplyTransformSolutionPass()";
+  let options = [
+    Option<"solutionFile", "solution-file", "std::string",
+           /*default=*/"\"solution.json\"", "Path to JSON solution file">,
+    Option<"techConfigFile", "tech-config", "std::string",
+          /*default=*/"\"\"", "Path to JSON file with technology-specific latency and DSP values">
+  ];
+  let dependentDialects = ["mlir::streamhls::dataflow::DataflowDialect"];
+}
+
 def MinimalBufferSizes : Pass<"streamhls-minimize-buffer-sizes", "func::FuncOp"> {
   let summary = "Minimal buffer sizes";
   let constructor = "mlir::streamhls::createMinimalBufferSizesPass()";

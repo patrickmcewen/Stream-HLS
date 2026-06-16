@@ -268,6 +268,148 @@ void streamhls::registerStreamHLSKernelPipeline() {
 }
 
 namespace {
+struct StreamHLSCodesignPipelineOptions
+    : public PassPipelineOptions<StreamHLSCodesignPipelineOptions> {
+  Option<std::string> hlsTopFunc{
+      *this, "top-func", llvm::cl::init("forward"),
+      llvm::cl::desc("Specify the top function of the design")};
+  Option<std::string> graphPath{
+      *this, "graph-file", llvm::cl::init("graph.dot"),
+      llvm::cl::desc("Specify the graph file path")};
+  Option<std::string> reportPath{
+      *this, "report-file", llvm::cl::init("report.csv"),
+      llvm::cl::desc("Output file prefix for the emitted design-point JSON")};
+  Option<std::string> mode{
+      *this, "mode", llvm::cl::init("emit"),
+      llvm::cl::desc("Codesign mode: 'emit' writes the current design point, "
+                     "'apply' applies a design point from JSON")};
+  Option<std::string> solutionFile{
+      *this, "solution-file", llvm::cl::init(""),
+      llvm::cl::desc("Path to the design-point JSON consumed in 'apply' mode")};
+  Option<uint> tilingLimit{
+      *this, "tiling-limit", llvm::cl::init(8),
+      llvm::cl::desc("Tiling limit")};
+  Option<bool> parallelizeNodes{
+      *this, "parallelize-nodes", llvm::cl::init(true),
+      llvm::cl::desc("Parallelize nodes (mirrors the combined-optimization backend)")};
+  Option<bool> bufferizeFuncArgs{
+      *this, "bufferize-func-args", llvm::cl::init(false),
+      llvm::cl::desc("Bufferize function arguments")};
+  Option<bool> optimizeConvReuse{
+      *this, "optimize-conv-reuse", llvm::cl::init(false),
+      llvm::cl::desc("Optimize convolution reuse")};
+  Option<bool> minimizeOnChipBuffers{
+      *this, "minimize-on-chip-buffers", llvm::cl::init(false),
+      llvm::cl::desc("Minimize on-chip buffers")};
+  Option<std::string> techConfigFile{
+      *this, "tech-config", llvm::cl::init(""),
+      llvm::cl::desc("Path to JSON file with technology-specific latency and DSP values")};
+};
+
+// Builds the affine dataflow graph. Mirrors the streamhls-kernel-pipeline
+// frontend up to (but not including) the optimization step, so that the DFG
+// seen by emit and apply matches the one the combined optimization operates on.
+static void addCodesignFrontend(OpPassManager &pm,
+                                const StreamHLSCodesignPipelineOptions &opts) {
+  pm.addPass(streamhls::createRemoveRedundantOpsPass());
+  pm.addPass(streamhls::createCreateWeightBinsPass(false, opts.hlsTopFunc));
+  pm.addPass(mlir::createCanonicalizerPass());
+
+  pm.addPass(mlir::createLinalgElementwiseOpFusionPass());
+  pm.addPass(mlir::createConvertTensorToLinalgPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+
+  pm.addPass(mlir::bufferization::createEmptyTensorToAllocTensorPass());
+  pm.addPass(mlir::createLinalgBufferizePass());
+  pm.addPass(arith::createArithBufferizePass());
+  pm.addPass(mlir::tensor::createTensorBufferizePass());
+  pm.addPass(func::createFuncBufferizePass());
+  pm.addPass(bufferization::createBufferResultsToOutParamsPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+
+  pm.addPass(mlir::createLinalgGeneralizationPass());
+  pm.addPass(mlir::createConvertLinalgToAffineLoopsPass());
+  pm.addPass(memref::createFoldMemRefAliasOpsPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+
+  pm.addPass(streamhls::createLowerCopyToAffinePass());
+  pm.addPass(memref::createFoldMemRefAliasOpsPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+
+  if (opts.bufferizeFuncArgs) {
+    pm.addPass(streamhls::createBufferizeFuncArgsPass());
+    pm.addPass(mlir::createCanonicalizerPass());
+  }
+
+  pm.addPass(streamhls::createRemoveLoopsOfUnitIterPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+
+  if (opts.optimizeConvReuse) {
+    pm.addPass(streamhls::createStencilDataReusePass());
+    pm.addPass(mlir::createCanonicalizerPass());
+  }
+
+  pm.addPass(streamhls::createConvertToSingleProducerSingleConsumerPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+
+  pm.addPass(streamhls::createConstantFIFOPropogationPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+}
+
+// Lowers the optimized affine IR to dataflow HLS. Mirrors the
+// streamhls-kernel-pipeline backend that runs after combined optimization.
+static void addCodesignBackend(OpPassManager &pm,
+                               const StreamHLSCodesignPipelineOptions &opts) {
+  pm.addPass(streamhls::createConvertMemRefsToFIFOsPass(opts.parallelizeNodes));
+  pm.addPass(mlir::createCanonicalizerPass());
+
+  if (opts.minimizeOnChipBuffers) {
+    pm.addPass(streamhls::createMinimalBufferSizesPass());
+    pm.addPass(mlir::createCanonicalizerPass());
+  }
+
+  pm.addPass(streamhls::createPrintDataflowGraphPass(opts.graphPath + ".dot", /*merge nodes*/ false));
+  pm.addPass(streamhls::createPrintDataflowGraphPass(opts.graphPath + "_merged.dot", /*merge nodes*/ true));
+  pm.addPass(mlir::createCanonicalizerPass());
+
+  pm.addPass(streamhls::createCreateTasksPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+
+  pm.addPass(streamhls::createCreateDataflowFromAffinePass());
+  pm.addPass(mlir::createCanonicalizerPass());
+
+  pm.addPass(streamhls::createOperationBlackboxPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+}
+} // namespace
+
+void streamhls::registerStreamHLSCodesignPipeline() {
+  PassPipelineRegistration<StreamHLSCodesignPipelineOptions>(
+      "streamhls-codesign-pipeline",
+      "StreamHLS codesign pipeline: emit or apply external transform design points",
+      [](OpPassManager &pm, const StreamHLSCodesignPipelineOptions &opts) {
+        addCodesignFrontend(pm, opts);
+
+        if (opts.mode == "emit") {
+          pm.addPass(streamhls::createEmitTransformSpacePass(
+              opts.reportPath, opts.tilingLimit, opts.techConfigFile));
+          return;
+        }
+
+        assert(opts.mode == "apply" && "mode must be 'emit' or 'apply'");
+        assert(!opts.solutionFile.empty() &&
+               "apply mode requires a non-empty solution-file");
+        pm.addPass(streamhls::createApplyTransformSolutionPass(
+            opts.solutionFile, opts.techConfigFile));
+        pm.addPass(mlir::affine::createAffineLoopNormalizePass());
+        pm.addPass(mlir::createCanonicalizerPass());
+
+        addCodesignBackend(pm, opts);
+      });
+}
+
+namespace {
 struct StreamHLSBaseKernelPipelineOptions
     : public PassPipelineOptions<StreamHLSBaseKernelPipelineOptions> {
   Option<std::string> hlsTopFunc{
@@ -409,6 +551,7 @@ void streamhls::registerStreamHLSHostPipeline() {
 void streamhls::registerTransformsPasses(){
   registerStreamHLSBaseKernelPipeline();
   registerStreamHLSKernelPipeline();
+  registerStreamHLSCodesignPipeline();
   registerStreamHLSHostPipeline();
   // registerSTREAMHLSPipeline();
   registerStreamHLSPasses();

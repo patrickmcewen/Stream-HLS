@@ -299,6 +299,12 @@ public:
 
   bool callCombinedOptimizationSolver(std::string fileName);
 
+  bool writeSolutionJSON(std::string fileName);
+
+  bool emitTransformSpaceJSON(std::string fileName, uint tilingLimit = 8);
+
+  bool applyTransformSolutionFromJSON(std::string solutionPath);
+
   bool applyNodePermutations(PermutationType type = Minimize);
 
   bool applyNodeParallelization();

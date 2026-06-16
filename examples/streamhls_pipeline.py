@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 import time
+import difflib
 # path lib
 from pathlib import Path
 import logging
@@ -36,6 +37,11 @@ parser.add_argument('--conv', type=int, required=False, default=0)
 parser.add_argument('--minimize-on-chip-buffers', type=int, required=False, default=0)
 parser.add_argument('--compile_only', type=int, required=False, default=0)
 parser.add_argument('--tech-config', type=str, required=False, default='', help='Path to technology config JSON file')
+parser.add_argument('--codesign-mode', type=str, required=False, default='', help="'emit' or 'apply' to use the codesign pipeline instead of the kernel pipeline")
+parser.add_argument('--solution-file', type=str, required=False, default='', help='Design-point JSON consumed in codesign apply mode')
+parser.add_argument('--dump-pass-ir', action='store_true', help='Dump MLIR after each kernel/codesign pass to a separate log file')
+parser.add_argument('--dump-pass-ir-diffs', action='store_true', help='With --dump-pass-ir, append a unified diff against the previous dump after each IR dump')
+parser.add_argument('--pass-ir-log', type=str, required=False, default='', help='Path for --dump-pass-ir output; defaults under mlir/intermediates')
 
 args = parser.parse_args()
 print("prjsdir: ", args.prjsdir)
@@ -58,6 +64,11 @@ conv = args.conv
 minimize_on_chip_buffers = args.minimize_on_chip_buffers
 compile_only = args.compile_only
 tech_config = args.tech_config
+codesign_mode = args.codesign_mode
+solution_file = args.solution_file
+dump_pass_ir = args.dump_pass_ir
+dump_pass_ir_diffs = args.dump_pass_ir_diffs
+pass_ir_log = args.pass_ir_log
 
 config = {
   "Model": model,
@@ -72,6 +83,7 @@ config = {
 }
 log_file = prj_path / 'streamhls'
 log_file = f'{log_file}_{time.strftime("%Y-%m-%d_%H-%M-%S")}.log'
+pass_ir_log_file = ''
 
 if(combOpt == 1):
   permOpt = 1
@@ -110,6 +122,76 @@ ch.setFormatter(formatter)
 logger.addHandler(fh)
 logger.addHandler(ch)
 
+def build_pass_ir_logging_args():
+    if not dump_pass_ir and not dump_pass_ir_diffs:
+        return ''
+
+    log_path = Path(pass_ir_log) if pass_ir_log else prj_path / 'mlir' / 'intermediates' / f'{model}_pass_ir.log'
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    global pass_ir_log_file
+    pass_ir_log_file = str(log_path)
+    logger.info(f'Writing pass IR dump to {pass_ir_log_file}')
+    return f'-mlir-disable-threading=true -mlir-print-ir-after-all -mlir-print-ir-module-scope 2> {pass_ir_log_file}'
+
+def append_pass_ir_diffs():
+    if not dump_pass_ir_diffs:
+        return
+    if not pass_ir_log_file or not Path(pass_ir_log_file).exists():
+        logger.error('Pass IR diff requested, but no pass IR log was produced.')
+        return
+
+    with open(pass_ir_log_file, 'r') as f:
+        lines = f.readlines()
+
+    sections = []
+    preamble = []
+    current_header = None
+    current_body = []
+
+    def finish_section():
+        if current_header is not None:
+            sections.append((current_header, current_body.copy()))
+
+    for line in lines:
+        if line.startswith('// -----// IR Dump '):
+            finish_section()
+            current_header = line
+            current_body = []
+        elif current_header is None:
+            preamble.append(line)
+        else:
+            current_body.append(line)
+    finish_section()
+
+    if len(sections) < 2:
+        logger.info('Pass IR diff requested, but fewer than two IR dumps were found.')
+        return
+
+    output = preamble.copy()
+    previous_header = None
+    previous_body = None
+    for header, body in sections:
+        output.append(header)
+        output.extend(body)
+        if previous_body is not None:
+            output.append('// -----// IR Diff Against Previous Dump //----- //\n')
+            diff = list(difflib.unified_diff(
+                previous_body,
+                body,
+                fromfile=previous_header.strip(),
+                tofile=header.strip(),
+                lineterm=''))
+            if diff:
+                output.extend(f'// {line}\n' for line in diff)
+            else:
+                output.append('// (no IR text changes)\n')
+        previous_header = header
+        previous_body = body
+
+    with open(pass_ir_log_file, 'w') as f:
+        f.writelines(output)
+    logger.info(f'Appended pass IR diffs to {pass_ir_log_file}')
+
 def run_command(cmd):
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     if result.stdout:
@@ -139,23 +221,45 @@ if compile_only == 0:
 
   # kernel pipeline
   tech_config_opt = f'tech-config={tech_config}' if tech_config else ''
-  cmd = f'streamhls-opt {prj_path}/mlir/input/{model}.mlir \
-    -streamhls-kernel-pipeline="top-func=forward \
-      graph-file={prj_path}/mlir/graphs/graph\
-      report-file={prj_path}/mlir/intermediates/{model}\
-      optimize-schedule={permOpt}\
-      parallelize-nodes={paralOpt}\
-      combined-optimization={combOpt}\
-      board-dsps={dsps} \
-      tiling-limit={tilelimit} \
-      time-limit-minutes={timelimit} \
-      bufferize-func-args={bufferize} \
-      optimize-conv-reuse={conv} \
-      minimize-on-chip-buffers={minimize_on_chip_buffers} \
-      {tech_config_opt} \
-      debug-point={debug}" \
-    > {prj_path}/mlir/kernel/{model}.mlir'
+  pass_ir_logging_args = build_pass_ir_logging_args()
+  if codesign_mode:
+    # External-search codesign pipeline: emit the current design point, or
+    # apply a (possibly modified) design point from JSON and lower to HLS.
+    solution_opt = f'solution-file={solution_file}' if solution_file else ''
+    cmd = f'streamhls-opt {prj_path}/mlir/input/{model}.mlir \
+      -streamhls-codesign-pipeline="top-func=forward \
+        graph-file={prj_path}/mlir/graphs/graph\
+        report-file={prj_path}/mlir/intermediates/{model}\
+        mode={codesign_mode}\
+        parallelize-nodes={paralOpt}\
+        tiling-limit={tilelimit} \
+        bufferize-func-args={bufferize} \
+        optimize-conv-reuse={conv} \
+        minimize-on-chip-buffers={minimize_on_chip_buffers} \
+        {tech_config_opt} \
+        {solution_opt}" \
+      {pass_ir_logging_args} \
+      > {prj_path}/mlir/kernel/{model}.mlir'
+  else:
+    cmd = f'streamhls-opt {prj_path}/mlir/input/{model}.mlir \
+      -streamhls-kernel-pipeline="top-func=forward \
+        graph-file={prj_path}/mlir/graphs/graph\
+        report-file={prj_path}/mlir/intermediates/{model}\
+        optimize-schedule={permOpt}\
+        parallelize-nodes={paralOpt}\
+        combined-optimization={combOpt}\
+        board-dsps={dsps} \
+        tiling-limit={tilelimit} \
+        time-limit-minutes={timelimit} \
+        bufferize-func-args={bufferize} \
+        optimize-conv-reuse={conv} \
+        minimize-on-chip-buffers={minimize_on_chip_buffers} \
+        {tech_config_opt} \
+        debug-point={debug}" \
+      {pass_ir_logging_args} \
+      > {prj_path}/mlir/kernel/{model}.mlir'
   run_command(cmd)
+  append_pass_ir_diffs()
 
   # copy prev command to prj_path/cmd.sh
   cmd_path = prj_path / 'cmd.sh'
@@ -163,10 +267,12 @@ if compile_only == 0:
     f.write(cmd)
 
 
-  cmd = f'streamhls-translate {prj_path}/mlir/kernel/{model}.mlir \
-    -emit-vivado-hls \
-    -o {prj_path}/hls/src/{model}.cpp'
-  run_command(cmd)
+  # emit mode only writes the design-space JSON; there is no design to lower.
+  if codesign_mode != 'emit':
+    cmd = f'streamhls-translate {prj_path}/mlir/kernel/{model}.mlir \
+      -emit-vivado-hls \
+      -o {prj_path}/hls/src/{model}.cpp'
+    run_command(cmd)
 
   end_time = time.time()
   # print(f'Time taken: {end_time - start_time} seconds')
@@ -183,19 +289,20 @@ if compile_only == 0:
   # print(f'Generated HLS for {model}')
   logger.info(f'Generated HLS for {model}')
 
-# run csim
-# print(f'Compiling {model}...')
-logger.info(f'Compiling {model}...')
-cmd = f'export PRJ_PATH={prj_path}/hls\n'
-cmd += f'g++ {prj_path}/hls/src/{model}_tb.cpp {prj_path}/hls/src/{model}.cpp -lm -I${{XILINX_HLS}}/include -o {prj_path}/hls/{model}.bin\n'
-cmd += f'cd {prj_path}/hls/ && ./{model}.bin'
-run_command(cmd)
-# print(f'Running csim for {model}...')
-# print(f'Done!')
-logger.info(f'Running csim for {model}...')
-logger.info(f'Success!')
+# run csim (skipped in codesign mode: evaluation is driven by the external search)
+if not codesign_mode:
+  # print(f'Compiling {model}...')
+  logger.info(f'Compiling {model}...')
+  cmd = f'export PRJ_PATH={prj_path}/hls\n'
+  cmd += f'g++ {prj_path}/hls/src/{model}_tb.cpp {prj_path}/hls/src/{model}.cpp -lm -I${{XILINX_HLS}}/include -o {prj_path}/hls/{model}.bin\n'
+  cmd += f'cd {prj_path}/hls/ && ./{model}.bin'
+  run_command(cmd)
+  # print(f'Running csim for {model}...')
+  # print(f'Done!')
+  logger.info(f'Running csim for {model}...')
+  logger.info(f'Success!')
 
-if compile_only == 0:
+if compile_only == 0 and not codesign_mode:
   report = {
     "Config": config,
     "Compilation Time (s)": end_time - start_time,
@@ -216,6 +323,9 @@ if compile_only == 0:
   import re
   with open(log_file, 'r') as f:
     lines = f.readlines()
+    if pass_ir_log_file and Path(pass_ir_log_file).exists():
+      with open(pass_ir_log_file, 'r') as pass_ir_f:
+        lines.extend(pass_ir_f.readlines())
     for line in lines:
       if('Permutation DesignSpaceSize:' in line):
         report["Permutation Design Space"] = int(re.findall(r'\d+', line)[0])
@@ -280,5 +390,3 @@ if compile_only == 0:
   report_file = log_file.replace('.log', '.json')
   with open(report_file, 'w') as f:
     f.write(json_report)
-
-

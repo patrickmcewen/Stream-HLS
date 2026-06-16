@@ -18,6 +18,9 @@
 #include "streamhls/Support/AffineMemAccess.h"
 #include "streamhls/Support/Utils.h"
 #include "streamhls/Support/TechConfig.h"
+#include "llvm/ADT/StringSet.h"
+#include "llvm/Support/JSON.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 // #include "gurobi_c++.h"
 
@@ -3979,6 +3982,397 @@ bool DFG::callCombinedOptimizationSolver(std::string filePath){
   //   );
   // }
   return true;
+}
+
+// Serialize one node's design point into the shared JSON schema. `permMap`
+// follows the permuteLoops convention (permMap[i] = position of original loop i
+// after permutation); `tripCounts` and `tilingFactors` are in original loop order.
+static llvm::json::Object serializeDesignPoint(unsigned id,
+                                               ArrayRef<int64_t> tripCounts,
+                                               ArrayRef<unsigned> permMap,
+                                               ArrayRef<unsigned> tilingFactors) {
+  assert(tripCounts.size() == permMap.size() &&
+         tripCounts.size() == tilingFactors.size() &&
+         "design point arrays must have matching length");
+  llvm::json::Array loopsArray;
+  llvm::json::Array permutation;
+  for (unsigned i = 0; i < tripCounts.size(); i++) {
+    llvm::json::Object loopObj;
+    loopObj["trip_count"] = tripCounts[i];
+    loopObj["tiling_factor"] = (int64_t)tilingFactors[i];
+    loopsArray.push_back(std::move(loopObj));
+    permutation.push_back((int64_t)permMap[i]);
+  }
+  llvm::json::Object nodeObj;
+  nodeObj["id"] = (int64_t)id;
+  nodeObj["permutation"] = std::move(permutation);
+  nodeObj["loops"] = std::move(loopsArray);
+  return nodeObj;
+}
+
+static std::string valueToString(Value value) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  if (value)
+    value.print(os);
+  return os.str();
+}
+
+static std::string typeToString(Type type) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  type.print(os);
+  return os.str();
+}
+
+static AffineMap getReadOrWriteMap(Operation *op) {
+  if (auto loadOp = dyn_cast<AffineLoadOp>(op))
+    return loadOp.getAffineMap();
+  if (auto storeOp = dyn_cast<AffineStoreOp>(op))
+    return storeOp.getAffineMap();
+  assert(false && "expected affine load or store");
+}
+
+static SmallVector<Value> getReadOrWriteMapOperands(Operation *op) {
+  if (auto loadOp = dyn_cast<AffineLoadOp>(op))
+    return SmallVector<Value>(loadOp.getMapOperands().begin(),
+                              loadOp.getMapOperands().end());
+  if (auto storeOp = dyn_cast<AffineStoreOp>(op))
+    return SmallVector<Value>(storeOp.getMapOperands().begin(),
+                              storeOp.getMapOperands().end());
+  assert(false && "expected affine load or store");
+}
+
+static std::optional<unsigned> getLoopIndexForValue(Value value,
+                                                    SmallVectorImpl<AffineForOp> &band) {
+  for (unsigned i = 0; i < band.size(); i++)
+    if (band[i].getInductionVar() == value)
+      return i;
+  return std::nullopt;
+}
+
+static SmallVector<std::optional<unsigned>>
+getTensorDimToLoopMap(Operation *op) {
+  AffineMap map = getReadOrWriteMap(op);
+  SmallVector<Value> operands = getReadOrWriteMapOperands(op);
+  AffineLoopBand band;
+  auto innerMostForOp = op->getParentOfType<AffineForOp>();
+  getLoopBandFromInnermost(innerMostForOp, band);
+
+  SmallVector<std::optional<unsigned>> dimToLoop;
+  dimToLoop.resize(map.getNumResults());
+  for (auto resultPair : llvm::enumerate(map.getResults())) {
+    SmallVector<unsigned> dimPositions;
+    resultPair.value().walk([&](AffineExpr expr) {
+      if (auto dimExpr = dyn_cast<AffineDimExpr>(expr))
+        dimPositions.push_back(dimExpr.getPosition());
+    });
+    if (dimPositions.size() != 1)
+      continue;
+    unsigned dimPos = dimPositions.front();
+    if (dimPos >= operands.size())
+      continue;
+    dimToLoop[resultPair.index()] = getLoopIndexForValue(operands[dimPos], band);
+  }
+  return dimToLoop;
+}
+
+static llvm::json::Object serializeMemrefEdge(DFG &dfg, unsigned srcId,
+                                              DFG::Edge edge,
+                                              unsigned edgeIdx) {
+  llvm::json::Object edgeObj;
+  edgeObj["id"] = (int64_t)edgeIdx;
+  edgeObj["src"] = (int64_t)srcId;
+  edgeObj["dst"] = (int64_t)edge.id;
+  edgeObj["value"] = valueToString(edge.value);
+  if (edge.value)
+    edgeObj["type"] = typeToString(edge.value.getType());
+
+  bool hasAffineAccesses = edge.srcOp && edge.dstOp;
+  edgeObj["has_affine_accesses"] = hasAffineAccesses;
+  if (!hasAffineAccesses)
+    return edgeObj;
+
+  auto producerDimToLoop = getTensorDimToLoopMap(edge.srcOp);
+  auto consumerDimToLoop = getTensorDimToLoopMap(edge.dstOp);
+  llvm::json::Array dimsArray;
+  unsigned rank = std::max(producerDimToLoop.size(), consumerDimToLoop.size());
+  for (unsigned dim = 0; dim < rank; dim++) {
+    llvm::json::Object dimObj;
+    dimObj["tensor_dim"] = (int64_t)dim;
+    if (dim < producerDimToLoop.size() && producerDimToLoop[dim])
+      dimObj["producer_loop"] = (int64_t)*producerDimToLoop[dim];
+    else
+      dimObj["producer_loop"] = nullptr;
+    if (dim < consumerDimToLoop.size() && consumerDimToLoop[dim])
+      dimObj["consumer_loop"] = (int64_t)*consumerDimToLoop[dim];
+    else
+      dimObj["consumer_loop"] = nullptr;
+    dimsArray.push_back(std::move(dimObj));
+  }
+  edgeObj["dims"] = std::move(dimsArray);
+  return edgeObj;
+}
+
+static llvm::json::Array serializeEdges(DFG &dfg) {
+  llvm::json::Array edgesArray;
+  unsigned edgeIdx = 0;
+  SmallVector<unsigned> nodeIds;
+  for (auto &nodePair : dfg.nodes)
+    nodeIds.push_back(nodePair.first);
+  llvm::sort(nodeIds);
+
+  for (unsigned srcId : nodeIds) {
+    auto outIt = dfg.outEdges.find(srcId);
+    if (outIt == dfg.outEdges.end())
+      continue;
+    for (auto edge : outIt->second)
+      edgesArray.push_back(serializeMemrefEdge(dfg, srcId, edge, edgeIdx++));
+  }
+  return edgesArray;
+}
+
+static void printIndent(llvm::raw_ostream &os, unsigned indent) {
+  os.indent(indent);
+}
+
+static void printOrderedJSONValue(llvm::raw_ostream &os,
+                                  const llvm::json::Value &value,
+                                  unsigned indent);
+
+static ArrayRef<const char *> getPreferredJSONKeyOrder() {
+  static const char *keys[] = {
+      "nodes",
+      "id",
+      "loops",
+      "trip_count",
+      "tiling_factor",
+      "permutation",
+      "edges",
+      "src",
+      "dst",
+      "value",
+      "type",
+      "has_affine_accesses",
+      "dims",
+      "tensor_dim",
+      "producer_loop",
+      "consumer_loop",
+  };
+  return keys;
+}
+
+static void printJSONString(llvm::raw_ostream &os, StringRef value) {
+  os << llvm::formatv("{0}", llvm::json::Value(value));
+}
+
+static void printOrderedJSONObject(llvm::raw_ostream &os,
+                                   const llvm::json::Object &object,
+                                   unsigned indent) {
+  os << "{";
+  if (object.empty()) {
+    os << "}";
+    return;
+  }
+
+  SmallVector<std::string> orderedKeys;
+  llvm::StringSet<> emitted;
+  for (const char *key : getPreferredJSONKeyOrder()) {
+    if (object.get(key)) {
+      orderedKeys.push_back(key);
+      emitted.insert(key);
+    }
+  }
+  SmallVector<std::string> remainingKeys;
+  for (const auto &entry : object) {
+    std::string key = ((StringRef)entry.first).str();
+    if (!emitted.contains(key))
+      remainingKeys.push_back(std::move(key));
+  }
+  llvm::sort(remainingKeys);
+  orderedKeys.append(remainingKeys.begin(), remainingKeys.end());
+
+  for (auto keyPair : llvm::enumerate(orderedKeys)) {
+    os << "\n";
+    printIndent(os, indent + 2);
+    printJSONString(os, keyPair.value());
+    os << ": ";
+    printOrderedJSONValue(os, *object.get(keyPair.value()), indent + 2);
+    if (keyPair.index() + 1 != orderedKeys.size())
+      os << ",";
+  }
+  os << "\n";
+  printIndent(os, indent);
+  os << "}";
+}
+
+static void printOrderedJSONArray(llvm::raw_ostream &os,
+                                  const llvm::json::Array &array,
+                                  unsigned indent) {
+  os << "[";
+  if (array.empty()) {
+    os << "]";
+    return;
+  }
+  for (auto valuePair : llvm::enumerate(array)) {
+    os << "\n";
+    printIndent(os, indent + 2);
+    printOrderedJSONValue(os, valuePair.value(), indent + 2);
+    if (valuePair.index() + 1 != array.size())
+      os << ",";
+  }
+  os << "\n";
+  printIndent(os, indent);
+  os << "]";
+}
+
+static void printOrderedJSONValue(llvm::raw_ostream &os,
+                                  const llvm::json::Value &value,
+                                  unsigned indent) {
+  if (auto *object = value.getAsObject())
+    return printOrderedJSONObject(os, *object, indent);
+  if (auto *array = value.getAsArray())
+    return printOrderedJSONArray(os, *array, indent);
+  os << llvm::formatv("{0}", value);
+}
+
+static bool writeDesignPointFile(std::string path, llvm::json::Array nodesArray,
+                                 std::optional<llvm::json::Array> edgesArray =
+                                     std::nullopt) {
+  llvm::json::Object root;
+  root["nodes"] = std::move(nodesArray);
+  if (edgesArray)
+    root["edges"] = std::move(*edgesArray);
+  std::error_code stdError;
+  llvm::raw_fd_ostream outFile(path, stdError);
+  assert(!outFile.has_error() && "failed to open design-point output file");
+  printOrderedJSONValue(outFile, llvm::json::Value(std::move(root)), 0);
+  return true;
+}
+
+bool DFG::writeSolutionJSON(std::string fileName) {
+  llvm::json::Array nodesArray;
+  for (auto& nodePair : nodes) {
+    auto& node = nodePair.second;
+    if (!node.op)
+      continue;
+    auto forOp = dyn_cast<AffineForOp>(node.op);
+    if (!forOp)
+      continue;
+
+    AffineLoopBand band;
+    getLoopBandFromOutermost(forOp, band);
+    assert(node.minPermIdx >= 0 && "solution has no chosen permutation");
+    ArrayRef<unsigned> permMap = node.nodeInfo[node.minPermIdx].permutation;
+    assert(permMap.size() == band.size() &&
+           node.tilingFactors.size() == band.size() &&
+           "solution state inconsistent with loop band");
+
+    SmallVector<int64_t> tripCounts;
+    SmallVector<unsigned> tilingFactors;
+    for (unsigned i = 0; i < band.size(); i++) {
+      tripCounts.push_back(band[i].getConstantUpperBound());
+      // tilingFactors are stored in permuted-position order; original loop i
+      // ends up at permuted position permMap[i].
+      tilingFactors.push_back(node.tilingFactors[permMap[i]]);
+    }
+    nodesArray.push_back(
+        serializeDesignPoint(node.id, tripCounts, permMap, tilingFactors));
+  }
+
+  return writeDesignPointFile(fileName + "_solution.json", std::move(nodesArray),
+                              serializeEdges(*this));
+}
+
+bool DFG::emitTransformSpaceJSON(std::string fileName, uint /*tilingLimit*/) {
+  if (failed(populateNodeInfo(true)))
+    return false;
+
+  llvm::json::Array nodesArray;
+  for (auto& nodePair : nodes) {
+    auto& node = nodePair.second;
+    if (!node.op)
+      continue;
+    auto forOp = dyn_cast<AffineForOp>(node.op);
+    if (!forOp)
+      continue;
+
+    AffineLoopBand band;
+    getLoopBandFromOutermost(forOp, band);
+
+    SmallVector<int64_t> tripCounts;
+    SmallVector<unsigned> permMap;
+    SmallVector<unsigned> tilingFactors;
+    for (unsigned i = 0; i < band.size(); i++) {
+      tripCounts.push_back(band[i].getConstantUpperBound());
+      permMap.push_back(i);        // identity: current loop order
+      tilingFactors.push_back(1);  // no tiling applied yet
+    }
+    nodesArray.push_back(
+        serializeDesignPoint(node.id, tripCounts, permMap, tilingFactors));
+  }
+
+  return writeDesignPointFile(fileName + "_space.json", std::move(nodesArray),
+                              serializeEdges(*this));
+}
+
+bool DFG::applyTransformSolutionFromJSON(std::string solutionPath) {
+  if (failed(populateNodeInfo(true)))
+    return false;
+  createRootNode();
+
+  auto bufferOrErr = llvm::MemoryBuffer::getFile(solutionPath);
+  assert(bufferOrErr && "failed to open solution file");
+  auto jsonOrErr = llvm::json::parse(bufferOrErr.get()->getBuffer());
+  assert(jsonOrErr && "failed to parse solution JSON");
+
+  auto* jsonObj = jsonOrErr->getAsObject();
+  assert(jsonObj && "solution must be a JSON object");
+  auto* nodesArr = jsonObj->getArray("nodes");
+  assert(nodesArr && "solution must have a 'nodes' array");
+
+  for (auto& nodeVal : *nodesArr) {
+    auto* nodeObj = nodeVal.getAsObject();
+    assert(nodeObj);
+    unsigned nodeId = (unsigned)*nodeObj->getInteger("id");
+    auto* permArr = nodeObj->getArray("permutation");
+    auto* loopsArr = nodeObj->getArray("loops");
+    assert(permArr && loopsArr && "node must have 'permutation' and 'loops'");
+    assert(permArr->size() == loopsArr->size() &&
+           "permutation and loops must have matching length");
+
+    auto nodeIt = nodes.find(nodeId);
+    assert(nodeIt != nodes.end() && "solution references unknown node ID");
+    auto& node = nodeIt->second;
+
+    // Requested permutation map (original loop i -> position permMap[i]).
+    SmallVector<unsigned> permMap;
+    for (auto& v : *permArr)
+      permMap.push_back((unsigned)*v.getAsInteger());
+
+    // Match the requested map against the enumerated search space.
+    int permIdx = -1;
+    for (auto info : llvm::enumerate(node.nodeInfo)) {
+      if (ArrayRef<unsigned>(info.value().permutation) == ArrayRef<unsigned>(permMap)) {
+        permIdx = info.index();
+        break;
+      }
+    }
+    assert(permIdx >= 0 && "requested permutation not found in node search space");
+    node.minPermIdx = permIdx;
+
+    // tiling_factor is given per loop in original order; applyCombinedOptimization
+    // expects factors in permuted-position order (factor at position permMap[i]).
+    node.tilingFactors.resize(permMap.size());
+    for (auto loopPair : llvm::enumerate(*loopsArr)) {
+      auto* loopObj = loopPair.value().getAsObject();
+      assert(loopObj && "each loop must be a JSON object");
+      unsigned factor = (unsigned)*loopObj->getInteger("tiling_factor");
+      node.tilingFactors[permMap[loopPair.index()]] = factor;
+    }
+  }
+
+  return applyCombinedOptimization();
 }
 
 bool DFG::callPermutationSolver(std::string filePath, bool isMinimize){
