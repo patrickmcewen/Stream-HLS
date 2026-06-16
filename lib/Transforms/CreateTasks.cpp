@@ -69,6 +69,9 @@ struct CreateTasks : public CreateTasksBase<CreateTasks> {
       auto loc = builder.getUnknownLoc();
       builder.setInsertionPoint(node.op);
       auto task = builder.create<TaskOp>(loc, ValueRange({}));
+      // Stamp the DFG node id so the emitted function name matches the id used
+      // in the design-space/solution JSON files.
+      task->setAttr("dataflow.node_id", builder.getI64IntegerAttr(node.id));
       auto taskBlock = builder.createBlock(&task.getBody());
       auto yield = builder.create<YieldOp>(loc, ValueRange({}));
       builder.setInsertionPointToStart(taskBlock);

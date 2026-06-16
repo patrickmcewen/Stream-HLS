@@ -178,6 +178,10 @@ struct TasksToFuncs : public OpRewritePattern<TaskOp> {
     rewriter.setInsertionPoint(task);
     auto node = rewriter.create<NodeOp>(rewriter.getUnknownLoc(), inputs,
                                         outputs, params);
+    // Carry the DFG node id stamped by CreateTasks onto the node so the emitted
+    // function name aligns with the id used in the JSON files.
+    if (auto nodeId = task->getAttr("dataflow.node_id"))
+      node->setAttr("dataflow.node_id", nodeId);
     auto nodeBlock = rewriter.createBlock(&node.getBody());
 
     auto inputArgs = nodeBlock->addArguments(ValueRange(inputs), inputLocs);
@@ -211,10 +215,14 @@ struct ConvertNodeToFunc : public OpRewritePattern<NodeOp> {
 
   LogicalResult matchAndRewrite(NodeOp node,
                                 PatternRewriter &rewriter) const override {
-    // Create a new sub-function.
+    // Create a new sub-function. Name it using the DFG node id stamped by
+    // CreateTasks so the function name matches the id in the JSON files. Fall
+    // back to a running counter only if the id is missing.
+    auto nodeIdAttr = node->getAttrOfType<IntegerAttr>("dataflow.node_id");
+    unsigned funcId = nodeIdAttr ? nodeIdAttr.getInt() : nodeIdx++;
     rewriter.setInsertionPoint(node->getParentOfType<func::FuncOp>());
     auto subFunc = rewriter.create<func::FuncOp>(
-        node.getLoc(), prefix.str() + "node" + std::to_string(nodeIdx++),
+        node.getLoc(), prefix.str() + "node" + std::to_string(funcId),
         rewriter.getFunctionType(node.getOperandTypes(), TypeRange()));
 
 
