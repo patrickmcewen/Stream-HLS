@@ -88,7 +88,10 @@ std::unique_ptr<Pass> createCombinedOptimizationPass(
 std::unique_ptr<Pass> createEmitTransformSpacePass(
   std::string reportFile = "space",
   uint tilingLimit = 8,
-  std::string techConfigFile = ""
+  std::string techConfigFile = "",
+  bool optimize = false,
+  uint DSPs = 512,
+  uint timeLimitMinutes = 1440
 );
 std::unique_ptr<Pass> createApplyTransformSolutionPass(
   std::string solutionFile = "solution.json",

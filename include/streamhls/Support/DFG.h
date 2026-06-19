@@ -301,7 +301,8 @@ public:
 
   bool writeSolutionJSON(std::string fileName);
 
-  bool emitTransformSpaceJSON(std::string fileName, uint tilingLimit = 8);
+  bool emitTransformSpaceJSON(std::string fileName, uint tilingLimit = 8,
+                              bool useSolution = false);
 
   bool applyTransformSolutionFromJSON(std::string solutionPath);
 

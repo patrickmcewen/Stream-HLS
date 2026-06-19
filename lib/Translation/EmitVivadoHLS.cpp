@@ -2545,8 +2545,8 @@ void ModuleEmitter::emitArrayOfStreams(dataflow::ArrayOfStreamsOp op) {
     auto shape = rankedType.getShape();
     if(auto elementType = dyn_cast<dataflow::StreamType>(rankedType.getElementType())) {
       emitValue(op.getResult());
-      //auto depth = elementType.getDepth();
-      //os << " depth=" << depth;
+      auto depth = elementType.getDepth();
+      os << " depth=" << depth;
     } else {
       emitError(op, "unsupported tensor element type.");
     }
@@ -2663,6 +2663,7 @@ void ModuleEmitter::emitModule(ModuleOp module) {
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <algorithm>
 
 using namespace std;
 

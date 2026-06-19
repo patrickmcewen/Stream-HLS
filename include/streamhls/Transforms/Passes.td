@@ -187,7 +187,13 @@ def EmitTransformSpace : Pass<"streamhls-emit-transform-space", "func::FuncOp"> 
     Option<"tilingLimit", "tiling-limit", "uint",
             /*default=*/"8", "Limit of tiling factor">,
     Option<"techConfigFile", "tech-config", "std::string",
-          /*default=*/"\"\"", "Path to JSON file with technology-specific latency and DSP values">
+          /*default=*/"\"\"", "Path to JSON file with technology-specific latency and DSP values">,
+    Option<"optimize", "optimize", "bool",
+          /*default=*/"false", "Run the combined optimization solver and emit the optimized design point instead of the untransformed default">,
+    Option<"DSPs", "board-dsps", "uint",
+          /*default=*/"512", "FPGA available DSPs (used when optimize=true)">,
+    Option<"timeLimitMinutes", "time-limit-minutes", "uint",
+          /*default=*/"1440", "MINLP solver time limit in minutes (used when optimize=true)">
   ];
   let dependentDialects = ["mlir::streamhls::dataflow::DataflowDialect"];
 }

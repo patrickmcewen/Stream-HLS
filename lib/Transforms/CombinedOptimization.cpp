@@ -91,10 +91,15 @@ std::unique_ptr<Pass> streamhls::createCombinedOptimizationPass(
 namespace {
 struct EmitTransformSpace : public EmitTransformSpaceBase<EmitTransformSpace> {
   EmitTransformSpace() = default;
-  EmitTransformSpace(std::string argReportFile, uint argTilingLimit, std::string argTechConfigFile) {
+  EmitTransformSpace(std::string argReportFile, uint argTilingLimit,
+                     std::string argTechConfigFile, bool argOptimize,
+                     uint argDSPs, uint argTimeLimitMinutes) {
     reportFile = argReportFile;
     tilingLimit = argTilingLimit;
     techConfigFile = argTechConfigFile;
+    optimize = argOptimize;
+    DSPs = argDSPs;
+    timeLimitMinutes = argTimeLimitMinutes;
   }
   void runOnOperation() override {
     if (!techConfigFile.empty())
@@ -106,6 +111,18 @@ struct EmitTransformSpace : public EmitTransformSpaceBase<EmitTransformSpace> {
       LLVM_DEBUG(llvm::dbgs() << "DFG init failed\n");
       return;
     }
+    if (optimize) {
+      // Run the combined optimization solver and emit the *optimized* design
+      // point (solved permutation + tiling), instead of the untransformed
+      // identity/no-tiling default. The solver populates node state in-place;
+      // emitTransformSpaceJSON then serializes it (without re-initializing).
+      graph.createCombinedOptimizationPerformanceModel(reportFile, DSPs,
+                                                       tilingLimit,
+                                                       timeLimitMinutes);
+      graph.callCombinedOptimizationSolver(reportFile);
+      graph.emitTransformSpaceJSON(reportFile, tilingLimit, /*useSolution=*/true);
+      return;
+    }
     graph.emitTransformSpaceJSON(reportFile, tilingLimit);
   }
 };
@@ -114,9 +131,14 @@ struct EmitTransformSpace : public EmitTransformSpaceBase<EmitTransformSpace> {
 std::unique_ptr<Pass> streamhls::createEmitTransformSpacePass(
   std::string reportFile,
   uint tilingLimit,
-  std::string techConfigFile
+  std::string techConfigFile,
+  bool optimize,
+  uint DSPs,
+  uint timeLimitMinutes
 ) {
-  return std::make_unique<EmitTransformSpace>(reportFile, tilingLimit, techConfigFile);
+  return std::make_unique<EmitTransformSpace>(reportFile, tilingLimit,
+                                              techConfigFile, optimize, DSPs,
+                                              timeLimitMinutes);
 }
 
 namespace {

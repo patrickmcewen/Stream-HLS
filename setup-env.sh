@@ -33,6 +33,11 @@ if [ -f /afs/ece.cmu.edu/support/xilinx/xilinx.release/Vivado-2023.2/Vitis_HLS/2
     source /afs/ece.cmu.edu/support/xilinx/xilinx.release/Vivado-2023.2/Vitis_HLS/2023.2/settings64.sh
 fi
 
+if [ -f /etc/profile.d/modules.sh ]; then
+    source /etc/profile.d/modules.sh
+    module load vitis/2022.1
+fi
+
 echo "Stream-HLS environment setup complete!"
 echo "  - Conda environment: streamhls"
 echo "  - AMPL: $(which ampl 2>/dev/null || echo 'not found')"

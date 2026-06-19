@@ -289,6 +289,16 @@ struct StreamHLSCodesignPipelineOptions
   Option<uint> tilingLimit{
       *this, "tiling-limit", llvm::cl::init(8),
       llvm::cl::desc("Tiling limit")};
+  Option<bool> optimize{
+      *this, "optimize", llvm::cl::init(false),
+      llvm::cl::desc("In 'emit' mode, run the combined optimization solver and "
+                     "emit the optimized design point instead of the default")};
+  Option<uint> boardDSPs{
+      *this, "board-dsps", llvm::cl::init(512),
+      llvm::cl::desc("FPGA available DSPs (used by emit optimize=true)")};
+  Option<uint> timeLimitMinutes{
+      *this, "time-limit-minutes", llvm::cl::init(1440),
+      llvm::cl::desc("MINLP solver time limit in minutes (emit optimize=true)")};
   Option<bool> parallelizeNodes{
       *this, "parallelize-nodes", llvm::cl::init(true),
       llvm::cl::desc("Parallelize nodes (mirrors the combined-optimization backend)")};
@@ -393,7 +403,8 @@ void streamhls::registerStreamHLSCodesignPipeline() {
 
         if (opts.mode == "emit") {
           pm.addPass(streamhls::createEmitTransformSpacePass(
-              opts.reportPath, opts.tilingLimit, opts.techConfigFile));
+              opts.reportPath, opts.tilingLimit, opts.techConfigFile,
+              opts.optimize, opts.boardDSPs, opts.timeLimitMinutes));
           return;
         }
 

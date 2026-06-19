@@ -3544,7 +3544,9 @@ bool DFG::createCombinedOptimizationPythonModel(std::string fileName){
   // declare variable for each node
   for(auto nodePair : nodes){
     auto& node = nodePair.second;
-    if(node.nodeInfo.size() > 0){
+    // Skip the root/sink helper nodes (minPermIdx == -1): they carry no chosen
+    // permutation and would emit an invalid identifier like "b10000_-1".
+    if(node.nodeInfo.size() > 0 && node.minPermIdx >= 0){
       pythonModel << "b" << node.id << "_" << node.minPermIdx << " = 1\n";
     }
   }
@@ -3651,7 +3653,12 @@ bool DFG::createCombinedOptimizationPythonModel(std::string fileName){
         auto currII = currNode->nodeInfo[currPermIdx].II;
         // alr is a variable
         if(inEdge.id != 10000){
-          auto alr = currNode->nodeInfo[currPermIdx].loadsMap[inEdge.dstOp].lastElementTime;// * currII;
+          // Use the tile-aware variable element-time equation (in x<id>_<loop>
+          // outer-trip variables the script binds to trip/tiling), not the
+          // concrete sequential lastElementTime -- otherwise the relative last
+          // read collapses to the untiled Pi(trip) and the model is no longer
+          // tile-dependent.
+          auto alr = currNode->nodeInfo[currPermIdx].loadsMap[inEdge.dstOp].lastElementTimeEq;
           pythonModel << "st" << id << " + ((" << alr << ") * "<< currII << ") * b" << id << "_" << currPermIdx << "\n";
         }else{
           pythonModel << "st" << id << "\n";
@@ -3673,11 +3680,11 @@ bool DFG::createCombinedOptimizationPythonModel(std::string fileName){
         }else{
           for(auto outEdge : outEdges[id]){ // may need to handle multiple outputs
             auto srcOp = outEdge.srcOp;
-            auto alw = currNode->nodeInfo[currPermIdx].storesMap[srcOp].lastElementTime;
+            auto alw = currNode->nodeInfo[currPermIdx].storesMap[srcOp].lastElementTimeEq;
             pythonModel << " + ((" << alw << ") * " << currII << ") * b" << id << "_" << currPermIdx;
           }
           if(inEdge.id != 10000){
-            auto alr = currNode->nodeInfo[currPermIdx].loadsMap[inEdge.dstOp].lastElementTime;
+            auto alr = currNode->nodeInfo[currPermIdx].loadsMap[inEdge.dstOp].lastElementTimeEq;
             pythonModel << " - ((" << alr << ") * " << currII << ") * b" << id << "_" << currPermIdx << "\n";
           }else{
             pythonModel << "\n";
@@ -3729,7 +3736,7 @@ bool DFG::createCombinedOptimizationPythonModel(std::string fileName){
           auto srcOp = outEdge.srcOp;
           auto currPermIdx = currNode->minPermIdx;
           auto currII = currNode->nodeInfo[currPermIdx].II;
-          auto afw = currNode->nodeInfo[currPermIdx].storesMap[srcOp].firstElementTime;
+          auto afw = currNode->nodeInfo[currPermIdx].storesMap[srcOp].firstElementTimeEq;
           pythonModel << " + (" << afw << ") * " << currII;
         }
       }
@@ -4123,6 +4130,8 @@ static llvm::json::Array serializeEdges(DFG &dfg) {
   llvm::sort(nodeIds);
 
   for (unsigned srcId : nodeIds) {
+    if (srcId == 10000)  // synthetic root node: its out-edges are function args,
+      continue;          // not inter-node buffers, so they are not design-point edges
     auto outIt = dfg.outEdges.find(srcId);
     if (outIt == dfg.outEdges.end())
       continue;
@@ -4284,8 +4293,13 @@ bool DFG::writeSolutionJSON(std::string fileName) {
                               serializeEdges(*this));
 }
 
-bool DFG::emitTransformSpaceJSON(std::string fileName, uint /*tilingLimit*/) {
-  if (failed(populateNodeInfo(true)))
+bool DFG::emitTransformSpaceJSON(std::string fileName, uint /*tilingLimit*/,
+                                bool useSolution) {
+  // Default (space) mode populates node info and emits the untransformed design
+  // point (identity permutation, no tiling). In solution mode the combined
+  // optimizer has already populated the node state (minPermIdx + tilingFactors),
+  // so reuse it -- re-running populateNodeInfo here would discard that result.
+  if (!useSolution && failed(populateNodeInfo(true)))
     return false;
 
   llvm::json::Array nodesArray;
@@ -4303,10 +4317,25 @@ bool DFG::emitTransformSpaceJSON(std::string fileName, uint /*tilingLimit*/) {
     SmallVector<int64_t> tripCounts;
     SmallVector<unsigned> permMap;
     SmallVector<unsigned> tilingFactors;
-    for (unsigned i = 0; i < band.size(); i++) {
-      tripCounts.push_back(band[i].getConstantUpperBound());
-      permMap.push_back(i);        // identity: current loop order
-      tilingFactors.push_back(1);  // no tiling applied yet
+    if (useSolution) {
+      assert(node.minPermIdx >= 0 && "solution has no chosen permutation");
+      ArrayRef<unsigned> solvedPerm = node.nodeInfo[node.minPermIdx].permutation;
+      assert(solvedPerm.size() == band.size() &&
+             node.tilingFactors.size() == band.size() &&
+             "solution state inconsistent with loop band");
+      for (unsigned i = 0; i < band.size(); i++) {
+        tripCounts.push_back(band[i].getConstantUpperBound());
+        permMap.push_back(solvedPerm[i]);
+        // tilingFactors are stored in permuted-position order; original loop i
+        // ends up at permuted position solvedPerm[i].
+        tilingFactors.push_back(node.tilingFactors[solvedPerm[i]]);
+      }
+    } else {
+      for (unsigned i = 0; i < band.size(); i++) {
+        tripCounts.push_back(band[i].getConstantUpperBound());
+        permMap.push_back(i);        // identity: current loop order
+        tilingFactors.push_back(1);  // no tiling applied yet
+      }
     }
     nodesArray.push_back(
         serializeDesignPoint(node.id, tripCounts, permMap, tilingFactors));
@@ -4371,6 +4400,22 @@ bool DFG::applyTransformSolutionFromJSON(std::string solutionPath) {
       node.tilingFactors[permMap[loopPair.index()]] = factor;
     }
   }
+
+  // Evaluate the analytical timing model at this applied design point and
+  // report the latency, so apply mode yields a number comparable to the
+  // external differentiable model. Must run before applyCombinedOptimization()
+  // physically tiles the loop band the recurrence is built from.
+  createCombinedOptimizationPythonModel("/tmp/streamhls_apply");
+  std::string cmd = "python /tmp/streamhls_apply_combined.py";
+  std::array<char, 128> buffer;
+  std::string result;
+  std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd.c_str(), "r"), pclose);
+  assert(pipe && "failed to launch applied timing model");
+  while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr)
+    result += buffer.data();
+  // The script prints the latency on its first line.
+  llvm::dbgs() << "Applied Latency: " << result.substr(0, result.find('\n'))
+               << "\n";
 
   return applyCombinedOptimization();
 }
