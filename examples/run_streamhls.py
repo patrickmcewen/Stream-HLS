@@ -12,11 +12,12 @@ parser.add_argument('-d', '--outdir', type=str, default='designs', help='Output 
 parser.add_argument('--dsps', type=int, default=2560*3, help='Number of DSPs')
 parser.add_argument('--tilelimit', type=int, default=10, help='Tile limit')
 parser.add_argument('--timelimit', type=int, default=20, help='Time limit')
-parser.add_argument('--bufferize', type=int, default=0, help='Bufferize function arguments')
-parser.add_argument('--conv', type=int, default=1, help='Enable conv optimization in StreamHLS pipeline')
+parser.add_argument('--bufferize', type=int, default=1, help='Bufferize function arguments')
+parser.add_argument('--conv', type=int, default=0, help='Enable conv optimization in StreamHLS pipeline')
 parser.add_argument('--tech-config', type=str, default='', help='Path to technology config JSON file')
 parser.add_argument('--codesign-mode', type=str, default='', choices=['', 'emit', 'apply'], help="Use the codesign pipeline: 'emit' writes the current design point, 'apply' applies a design point from JSON")
 parser.add_argument('--solution-file', type=str, default='', help='Design-point JSON consumed in codesign apply mode')
+parser.add_argument('--codesign-optimize', action='store_true', help="In codesign 'emit' mode, run the combined optimization solver and emit the optimized design point instead of the untransformed default")
 parser.add_argument('--dump-pass-ir', action='store_true', help='Dump MLIR after each StreamHLS kernel/codesign pass to a separate log file')
 parser.add_argument('--dump-pass-ir-diffs', action='store_true', help='With --dump-pass-ir, append a unified diff against the previous dump after each IR dump')
 parser.add_argument('--pass-ir-log', type=str, default='', help='Path for --dump-pass-ir output; defaults under the design mlir/intermediates directory')
@@ -67,6 +68,7 @@ print(f"outDir: {outDir}")
 tech_config_arg = f'--tech-config={tech_config}' if tech_config else ''
 codesign_arg = f'--codesign-mode={args.codesign_mode}' if args.codesign_mode else ''
 solution_arg = f'--solution-file={args.solution_file}' if args.solution_file else ''
+codesign_optimize_arg = '--codesign-optimize' if args.codesign_optimize else ''
 dump_pass_ir_arg = '--dump-pass-ir' if args.dump_pass_ir else ''
 dump_pass_ir_diffs_arg = '--dump-pass-ir-diffs' if args.dump_pass_ir_diffs else ''
 pass_ir_log_arg = f'--pass-ir-log={args.pass_ir_log}' if args.pass_ir_log else ''
@@ -88,6 +90,7 @@ cmd = f'python streamhls_pipeline.py \
   {tech_config_arg} \
   {codesign_arg} \
   {solution_arg} \
+  {codesign_optimize_arg} \
   {dump_pass_ir_arg} \
   {dump_pass_ir_diffs_arg} \
   {pass_ir_log_arg}'

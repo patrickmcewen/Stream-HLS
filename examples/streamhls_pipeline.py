@@ -39,6 +39,7 @@ parser.add_argument('--compile_only', type=int, required=False, default=0)
 parser.add_argument('--tech-config', type=str, required=False, default='', help='Path to technology config JSON file')
 parser.add_argument('--codesign-mode', type=str, required=False, default='', help="'emit' or 'apply' to use the codesign pipeline instead of the kernel pipeline")
 parser.add_argument('--solution-file', type=str, required=False, default='', help='Design-point JSON consumed in codesign apply mode')
+parser.add_argument('--codesign-optimize', action='store_true', help="In codesign 'emit' mode, run the combined optimization solver and emit the optimized design point")
 parser.add_argument('--dump-pass-ir', action='store_true', help='Dump MLIR after each kernel/codesign pass to a separate log file')
 parser.add_argument('--dump-pass-ir-diffs', action='store_true', help='With --dump-pass-ir, append a unified diff against the previous dump after each IR dump')
 parser.add_argument('--pass-ir-log', type=str, required=False, default='', help='Path for --dump-pass-ir output; defaults under mlir/intermediates')
@@ -66,6 +67,7 @@ compile_only = args.compile_only
 tech_config = args.tech_config
 codesign_mode = args.codesign_mode
 solution_file = args.solution_file
+codesign_optimize = args.codesign_optimize
 dump_pass_ir = args.dump_pass_ir
 dump_pass_ir_diffs = args.dump_pass_ir_diffs
 pass_ir_log = args.pass_ir_log
@@ -226,6 +228,10 @@ if compile_only == 0:
     # External-search codesign pipeline: emit the current design point, or
     # apply a (possibly modified) design point from JSON and lower to HLS.
     solution_opt = f'solution-file={solution_file}' if solution_file else ''
+    # emit mode can optionally run the combined optimization solver and emit the
+    # optimized design point; it then needs the solver's DSP/time-limit knobs.
+    optimize_opt = (f'optimize=true board-dsps={dsps} time-limit-minutes={timelimit}'
+                    if codesign_optimize else '')
     cmd = f'streamhls-opt {prj_path}/mlir/input/{model}.mlir \
       -streamhls-codesign-pipeline="top-func=forward \
         graph-file={prj_path}/mlir/graphs/graph\
@@ -237,6 +243,7 @@ if compile_only == 0:
         optimize-conv-reuse={conv} \
         minimize-on-chip-buffers={minimize_on_chip_buffers} \
         {tech_config_opt} \
+        {optimize_opt} \
         {solution_opt}" \
       {pass_ir_logging_args} \
       > {prj_path}/mlir/kernel/{model}.mlir'
