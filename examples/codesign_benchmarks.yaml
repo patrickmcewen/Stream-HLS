@@ -1,0 +1,16 @@
+# Named groups of benchmark kernels for run_codesign_group.py.
+# Each entry is a kernel registered under the "codesign" label in data.py's
+# model_configs; the group name must match the PyTorch source subdir under
+# pymodels/ (e.g. polybench -> pymodels/polybench). The wrapper creates the
+# design dir <out-root>/<group>/<kernel>/<kernel> when it runs.
+polybench:
+  - gemm
+  - k3mm
+  - atax
+  - bicg
+  - gesummv
+  - k2mm
+  - mvt
+
+transformers:
+ - MultiHeadSelfAttention

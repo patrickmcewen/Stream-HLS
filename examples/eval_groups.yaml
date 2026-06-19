@@ -1,0 +1,29 @@
+# Named groups of design-point solution JSONs for eval_timing.py --group <name>.
+# Each entry is either:
+#   - a path string  <design_dir>/mlir/intermediates/<stem>.json  (bufferize 0), or
+#   - a mapping  {json: <path>, bufferize: 0|1}  to set bufferize-func-args.
+# eval_timing derives the design_dir (and model = its last path component) from
+# the path, so a group may span multiple benchmarks. Use bufferize: 1 for models
+# whose input MLIR keeps tensor func args (e.g. MHSA); polybench inputs are
+# already bufferized and need bufferize 0 (the default) -- the wrong value aborts
+# streamhls-opt.
+polybench:
+  - designs/polybench/k3mm/k3mm/mlir/intermediates/k3mm_space.json
+  - designs/polybench/gemm2/gemm/mlir/intermediates/gemm_space.json
+  - /pool0/pmcewen/rsgvm13dir/codesign2/Stream-HLS/examples/designs/polybench/atax/atax/mlir/intermediates/atax_space.json
+  - designs/polybench/bicg/bicg/mlir/intermediates/bicg_space.json
+  - designs/polybench/gesummv/gesummv/mlir/intermediates/gesummv_space.json
+  - designs/polybench/k2mm/k2mm/mlir/intermediates/k2mm_space.json
+  - designs/polybench/mvt/mvt/mlir/intermediates/mvt_space.json
+
+mhsa:
+  - json: /pool0/pmcewen/rsgvm13dir/codesign2/Stream-HLS/examples/designs/transformers/MHSA/MultiHeadSelfAttention/mlir/intermediates/MultiHeadSelfAttention_space.json
+    bufferize: 1
+
+mhsa_bad_fusion:
+  - json: /pool0/pmcewen/rsgvm13dir/codesign2/Stream-HLS/examples/designs/transformers/MHSA2/MultiHeadSelfAttention/mlir/intermediates/MultiHeadSelfAttention_bad_fusion_space.json
+    bufferize: 1
+
+mhsa_vanilla:
+  - json: /pool0/pmcewen/rsgvm13dir/codesign2/Stream-HLS/examples/designs/transformers/MHSA2/MultiHeadSelfAttention/mlir/intermediates/MultiHeadSelfAttention_space_vanilla.json
+    bufferize: 1
