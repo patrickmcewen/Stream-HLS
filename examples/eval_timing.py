@@ -69,9 +69,10 @@ def _derive(solution_json):
 def _resolve(args):
     """(list of (solution_json, bufferize), label) from --group or positional paths.
 
-    A YAML entry is either a plain path string (bufferize defaults to 0) or a
-    mapping {json: <path>, bufferize: 0|1} for models whose input MLIR keeps
-    tensor func args (e.g. MHSA needs bufferize: 1)."""
+    A YAML entry is either a plain path string or a mapping
+    {json: <path>, bufferize: 0|1} for models whose input MLIR keeps tensor func
+    args (e.g. MHSA needs bufferize: 1). Entries that don't set bufferize inherit
+    --bufferize (default 0)."""
     if args.group:
         with open(args.config) as f:
             groups = yaml.safe_load(f)
@@ -89,9 +90,9 @@ def _resolve(args):
     for e in entries:
         if isinstance(e, dict):
             assert "json" in e, f"entry {e} missing 'json' key"
-            out.append((e["json"], int(e.get("bufferize", 0))))
+            out.append((e["json"], int(e.get("bufferize", args.bufferize))))
         else:
-            out.append((e, 0))
+            out.append((e, args.bufferize))
     return out, label
 
 
@@ -165,12 +166,12 @@ def collect(design_dir, model, solution_json, log, csv):
         log.write(f"{nid:>5}{diff_lat:>12.1f}{span:>11.1f}{st:>10.1f}{fw:>10.1f}"
                   f"{lw:>10.1f}{hls_lat:>10}{str(ii):>7}{rel:>8.2%}\n")
         csv.write(f"{name},{nid},{diff_lat:.1f},{span:.1f},{st:.1f},{fw:.1f},"
-                  f"{lw:.1f},{hls_lat},{ii},{rel:.4f}\n")
+                  f"{lw:.1f},{hls_lat},{ii},{rel:.4f},\n")
 
     rel_total = abs(total - hls["total"]) / hls["total"]
     log.write(f"{'TOTAL':>5}{total:>12.1f}{'':>11}{'':>10}{'':>10}{'':>10}"
               f"{hls['total']:>10}{'':>7}{rel_total:>8.2%}\n")
-    csv.write(f"{name},TOTAL,{total:.1f},,,,,{hls['total']},,{rel_total:.4f}\n")
+    csv.write(f"{name},TOTAL,{total:.1f},,,,,{hls['total']},,{rel_total:.4f},\n")
 
     # Per-edge buffer-fill (producer tiles the analytical model says the consumer
     # waits for before firing). edge_<id> rows in the CSV carry the same value.
@@ -179,7 +180,7 @@ def collect(design_dir, model, solution_json, log, csv):
         fill = per_edge[e["id"]].item()
         arc = f"{e['src']}->{e['dst']}"
         log.write(f"{e['id']:>5}{arc:>11}{fill:>10.2f}\n")
-        csv.write(f"{name},edge_{e['id']},{fill:.4f},,,,,,,\n")
+        csv.write(f"{name},edge_{e['id']},{fill:.4f},,,,,,,,{arc}\n")
 
     print(f"  {name}: diff total={total:.0f} hls total={hls['total']} rel={rel_total:.2%}")
 
@@ -198,6 +199,9 @@ if __name__ == "__main__":
                          "artifacts (none)")
     ap.add_argument("--jobs", "-j", type=int, default=1,
                     help="launch --runner local: number of concurrent vitis_hls runs")
+    ap.add_argument("--bufferize", type=int, default=0, choices=[0, 1],
+                    help="bufferize-func-args for entries that don't set it "
+                         "(1 for models with tensor func args, e.g. MHSA)")
     ap.add_argument("--log-dir", default="eval_log")
     args = ap.parse_args()
 
@@ -250,7 +254,7 @@ if __name__ == "__main__":
         csv_path = f"{args.log_dir}/eval_{label}_{ts}.csv"
         with open(log_path, "w") as log, open(csv_path, "w") as csv:
             csv.write("design_point,node,diff_Nout_Tfire,diff_lw_st,diff_st,"
-                      "diff_fw,diff_lw,hls_lat,hls_II,rel_err\n")
+                      "diff_fw,diff_lw,hls_lat,hls_II,rel_err,edge\n")
             for sol, _bufferize in solutions:
                 design_dir, model = _derive(sol)
                 collect(design_dir, model, sol, log, csv)

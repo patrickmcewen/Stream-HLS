@@ -113,7 +113,8 @@ def print_per_node(shls_nodes, diff_nodes):
               f"fw={_fmt(s['fw']):>13} lw={_fmt(s['lw']):>13}")
         print(f"    diff     : st={_fmt(d['st'].item()):>13} "
               f"fw={_fmt(d['fw'].item()):>13} lw={_fmt(d['lw'].item()):>13} "
-              f"T_fire={d['T_fire'].item():.1f} N_out={d['N_out'].item():.1f}")
+              f"T_fire={d['T_fire'].item():.1f} N_out={d['N_out'].item():.1f} "
+              f"II={d['II'].item():.2f}")
 
 
 def print_per_edge(edges, per_edge):
@@ -131,6 +132,10 @@ if __name__ == "__main__":
                     help="dump per-node st/fw/lw of both models")
     ap.add_argument("--emit-hls", action="store_true",
                     help="also translate each applied design point to HLS C++")
+    ap.add_argument("--bufferize", type=int, default=0,
+                    help="bufferize-func-args for streamhls-opt: 0 for the "
+                         "already-bufferized polybench inputs, 1 for models whose "
+                         "func args are still tensors (e.g. MHSA)")
     args = ap.parse_args()
 
     design_dir = args.design_dir.rstrip("/")
@@ -139,7 +144,8 @@ if __name__ == "__main__":
     print(f"{'design point':<28}{'streamhls':>14}{'diff_model':>14}{'rel.err':>10}")
     print("-" * 66)
     for sol in args.solutions:
-        shls = streamhls_latency(design_dir, model, sol, emit_hls=args.emit_hls)
+        shls = streamhls_latency(design_dir, model, sol, emit_hls=args.emit_hls,
+                                 bufferize=args.bufferize)
         graph, out = diff_analyze(sol)
         mine = out["total_cycles"].item()
         rel = abs(mine - shls) / shls

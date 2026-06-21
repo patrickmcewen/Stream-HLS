@@ -3994,6 +3994,94 @@ bool DFG::callCombinedOptimizationSolver(std::string filePath){
 // Serialize one node's design point into the shared JSON schema. `permMap`
 // follows the permuteLoops convention (permMap[i] = position of original loop i
 // after permutation); `tripCounts` and `tilingFactors` are in original loop order.
+// Longest chain of arithmetic-op latencies from the loop-carried load `loadRes`
+// to its store value `stored`, i.e. the recurrence latency a pipelined reduction
+// must satisfy as its II. Generalizes getForLoopII's single-op latency to a
+// multi-op reduction chain (e.g. fmul+fadd in a fused multiply-accumulate, or
+// fexp+fadd in a softmax running-sum): only ops with a known TechConfig short
+// name (the float arithmetic ops) contribute latency; routing ops (loads, casts,
+// affine.apply) contribute 0. SSA dominance makes a single program-order walk a
+// valid longest-path pass (every def precedes its uses).
+static int64_t getRecurrenceLatency(AffineForOp nest, Value loadRes,
+                                    Value stored) {
+  DenseMap<Value, int64_t> dist;  // longest arith latency from loadRes to value
+  dist[loadRes] = 0;
+  nest.walk<WalkOrder::PreOrder>([&](Operation *op) {
+    int64_t best = INT64_MIN;
+    for (Value operand : op->getOperands()) {
+      auto it = dist.find(operand);
+      if (it != dist.end())
+        best = std::max(best, it->second);
+    }
+    if (best == INT64_MIN)
+      return;  // this op is not reachable from the accumulator load
+    StringRef name = op->getName().getStringRef();
+    int64_t lat =
+        TechConfig::getShortName(name).empty() ? 0 : getTechConfig().getLatency(name);
+    for (Value res : op->getResults()) {
+      auto &slot = dist[res];  // operator[] seeds 0; best+lat >= 0 so max is safe
+      slot = std::max(slot, best + lat);
+    }
+  });
+  auto it = dist.find(stored);
+  int64_t r = (it == dist.end()) ? 1 : it->second;
+  return r < 1 ? 1 : r;
+}
+
+// All information the differentiable timing model needs to reconstruct a node's
+// loop II under any permutation, mirroring getForLoopII:
+//   reductionLatency  L  -- the recurrence (reduction-chain) latency; II = L when
+//                           a reduction loop is innermost, else 1.
+//   reductionLoops       -- original-order loop indices whose IV does NOT index
+//                           the loop-carried store; placing one innermost is
+//                           exactly the condition getForLoopII checks for II = L.
+// A node with no loop-carried store (no reduction) yields L = 1 and an empty set.
+static void computeNodeIIInfo(AffineForOp forOp, int64_t &reductionLatency,
+                              SmallVectorImpl<unsigned> &reductionLoops) {
+  reductionLatency = 1;
+  reductionLoops.clear();
+  AffineLoopBand band;
+  getLoopBandFromOutermost(forOp, band);  // original (outermost-first) order
+  SmallVector<AffineStoreOp> storeOps;
+  SmallVector<AffineLoadOp> loadOps;
+  forOp.walk([&](Operation *op) {
+    if (auto l = dyn_cast<AffineLoadOp>(op))
+      loadOps.push_back(l);
+    else if (auto s = dyn_cast<AffineStoreOp>(op))
+      storeOps.push_back(s);
+  });
+  for (auto storeOp : storeOps) {
+    for (auto loadOp : loadOps) {
+      if (storeOp.getMemRef() != loadOp.getMemRef() ||
+          storeOp->getBlock() != loadOp->getBlock())
+        continue;  // not a loop-carried (read-modify-write) pair
+      reductionLatency =
+          getRecurrenceLatency(forOp, loadOp.getResult(), storeOp.getValueToStore());
+      auto storeIVs = storeOp.getMapOperands();
+      reductionLoops.clear();
+      for (auto p : llvm::enumerate(band)) {
+        Value iv = p.value().getInductionVar();
+        if (!llvm::is_contained(storeIVs, iv))
+          reductionLoops.push_back(p.index());
+      }
+    }
+  }
+}
+
+// Attach reduction_latency / reduction_loops (see computeNodeIIInfo) onto a
+// serialized node object so the differentiable model gets the exact per-node II
+// primitives instead of inferring them from edges with a hard-coded latency.
+static void addNodeIIInfo(llvm::json::Object &nodeObj, AffineForOp forOp) {
+  int64_t reductionLatency;
+  SmallVector<unsigned> reductionLoops;
+  computeNodeIIInfo(forOp, reductionLatency, reductionLoops);
+  nodeObj["reduction_latency"] = reductionLatency;
+  llvm::json::Array loopsArray;
+  for (unsigned idx : reductionLoops)
+    loopsArray.push_back((int64_t)idx);
+  nodeObj["reduction_loops"] = std::move(loopsArray);
+}
+
 static llvm::json::Object serializeDesignPoint(unsigned id,
                                                ArrayRef<int64_t> tripCounts,
                                                ArrayRef<unsigned> permMap,
@@ -4157,6 +4245,8 @@ static ArrayRef<const char *> getPreferredJSONKeyOrder() {
       "trip_count",
       "tiling_factor",
       "permutation",
+      "reduction_latency",
+      "reduction_loops",
       "edges",
       "src",
       "dst",
@@ -4285,8 +4375,9 @@ bool DFG::writeSolutionJSON(std::string fileName) {
       // ends up at permuted position permMap[i].
       tilingFactors.push_back(node.tilingFactors[permMap[i]]);
     }
-    nodesArray.push_back(
-        serializeDesignPoint(node.id, tripCounts, permMap, tilingFactors));
+    auto nodeObj = serializeDesignPoint(node.id, tripCounts, permMap, tilingFactors);
+    addNodeIIInfo(nodeObj, forOp);
+    nodesArray.push_back(std::move(nodeObj));
   }
 
   return writeDesignPointFile(fileName + "_solution.json", std::move(nodesArray),
@@ -4337,8 +4428,9 @@ bool DFG::emitTransformSpaceJSON(std::string fileName, uint /*tilingLimit*/,
         tilingFactors.push_back(1);  // no tiling applied yet
       }
     }
-    nodesArray.push_back(
-        serializeDesignPoint(node.id, tripCounts, permMap, tilingFactors));
+    auto nodeObj = serializeDesignPoint(node.id, tripCounts, permMap, tilingFactors);
+    addNodeIIInfo(nodeObj, forOp);
+    nodesArray.push_back(std::move(nodeObj));
   }
 
   return writeDesignPointFile(fileName + "_space.json", std::move(nodesArray),

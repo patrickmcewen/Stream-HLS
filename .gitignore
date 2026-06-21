@@ -7,3 +7,5 @@ __pycache__
 .vscode
 /ampl.linux-intel64
 **/designs/**
+**/eval_log/**
+**/opt_log/**

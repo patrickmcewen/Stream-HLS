@@ -37,6 +37,10 @@ public:
   /// Check if a config file was successfully loaded
   bool isConfigLoaded() const { return configLoaded; }
 
+  /// Map an MLIR operation name (e.g. "arith.addf") to its short config name
+  /// (e.g. "fadd"); empty when the op has no modeled latency (routing ops).
+  static llvm::StringRef getShortName(llvm::StringRef opName);
+
 private:
   /// Initialize default values
   void initDefaults();
@@ -46,9 +50,6 @@ private:
 
   /// Map from operation short name to DSP usage
   llvm::StringMap<int64_t> dspUsageMap;
-
-  /// Map from MLIR operation name to short name
-  static llvm::StringRef getShortName(llvm::StringRef opName);
 
   bool configLoaded = false;
 };
