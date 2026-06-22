@@ -2066,6 +2066,17 @@ void ModuleEmitter::emitLoopDirectives(Operation *loop) {
 //   }
 // }
 
+// Infer the bind_storage memory type from how the buffer is accessed: a buffer
+// that is only ever read is a ROM; one that is written is a RAM. RAM_S2P (one
+// read port, one write port) covers the producer/consumer buffers StreamHLS
+// generates; HLS adapts the schedule when more ports are needed.
+static std::string inferStorageType(Value memref) {
+  for (Operation *user : memref.getUsers())
+    if (isa<AffineStoreOp, memref::StoreOp>(user))
+      return "RAM_S2P";
+  return "ROM_1P";
+}
+
 void ModuleEmitter::emitArrayDirectives(Value memref) {
   bool emitPragmaFlag = false;
   auto type = memref.getType().cast<MemRefType>();
@@ -2126,6 +2137,30 @@ void ModuleEmitter::emitArrayDirectives(Value memref) {
         os << " complete";
         os << " dim=" << dim + 1 << "\n";
       }
+    }
+  }
+
+  // Emit bind_storage for internal on-chip RAM/ROM buffers so the storage
+  // latency can be overridden (UG1399 Table 38: RAM/ROM latency in [1,3]).
+  // Streams (FIFOs) returned above; fully-partitioned arrays become registers,
+  // not memories; function-argument ports (no defining op) are interface ports.
+  if (Operation *defOp = memref.getDefiningOp()) {
+    if (!isFullyPartitioned(type)) {
+      int64_t latency = 1;
+      if (auto latAttr =
+              defOp->getAttrOfType<IntegerAttr>("streamhls.mem_latency"))
+        latency = latAttr.getInt();
+      if (latency < 1)
+        latency = 1;
+      if (latency > 3)
+        latency = 3;
+
+      emitPragmaFlag = true;
+      indent();
+      os << "#pragma HLS bind_storage variable=";
+      emitValue(memref);
+      os << " type=" << inferStorageType(memref) << " impl=auto latency="
+         << latency << "\n";
     }
   }
 

@@ -391,7 +391,11 @@ class DFGTiming:
                 _, t_op_p, _ = intr[p]
                 fill = self._edge_fill(e, params)
                 per_edge[e["id"]] = fill
-                cands.append(st[p] + fill * t_op_p)
+                # Buffer read latency delays when the consumer can start: the
+                # producer must emit fill tiles, then the storage read takes
+                # `latency` cycles (UG1399 bind_storage knob, default 1).
+                mem_lat = float(e.get("latency", 1))
+                cands.append(st[p] + fill * t_op_p + mem_lat)
             st[nid] = torch.stack(cands).max() if len(cands) > 1 else cands[0]
 
         per_node = {}

@@ -4172,6 +4172,11 @@ getTensorDimToLoopMap(Operation *op) {
   return dimToLoop;
 }
 
+// Default per-buffer storage latency when no design point overrides it. RAM
+// read latency on the interface/internal pipeline is valid in [1,3] (UG1399
+// Table 38); 1 matches the block-RAM minimum.
+static constexpr int64_t kDefaultMemLatency = 1;
+
 static llvm::json::Object serializeMemrefEdge(DFG &dfg, unsigned srcId,
                                               DFG::Edge edge,
                                               unsigned edgeIdx) {
@@ -4182,6 +4187,10 @@ static llvm::json::Object serializeMemrefEdge(DFG &dfg, unsigned srcId,
   edgeObj["value"] = valueToString(edge.value);
   if (edge.value)
     edgeObj["type"] = typeToString(edge.value.getType());
+  // Configurable per-buffer storage latency (UG1399 Table 38: RAM latency in
+  // [1,3]). Emitted as a design-point knob; the differentiable model reads it
+  // and apply mode tags the buffer's alloc so EmitVivadoHLS emits bind_storage.
+  edgeObj["latency"] = kDefaultMemLatency;
 
   bool hasAffineAccesses = edge.srcOp && edge.dstOp;
   edgeObj["has_affine_accesses"] = hasAffineAccesses;
@@ -4209,9 +4218,11 @@ static llvm::json::Object serializeMemrefEdge(DFG &dfg, unsigned srcId,
   return edgeObj;
 }
 
-static llvm::json::Array serializeEdges(DFG &dfg) {
-  llvm::json::Array edgesArray;
-  unsigned edgeIdx = 0;
+// Deterministic edge order shared by emit and apply: sorted source-node id,
+// then each node's out-edge order. The emitted JSON edge "id" indexes into this
+// list, so apply mode can map a solution edge back to its in-memory buffer.
+static SmallVector<std::pair<unsigned, DFG::Edge>> getOrderedEdges(DFG &dfg) {
+  SmallVector<std::pair<unsigned, DFG::Edge>> ordered;
   SmallVector<unsigned> nodeIds;
   for (auto &nodePair : dfg.nodes)
     nodeIds.push_back(nodePair.first);
@@ -4224,8 +4235,17 @@ static llvm::json::Array serializeEdges(DFG &dfg) {
     if (outIt == dfg.outEdges.end())
       continue;
     for (auto edge : outIt->second)
-      edgesArray.push_back(serializeMemrefEdge(dfg, srcId, edge, edgeIdx++));
+      ordered.push_back({srcId, edge});
   }
+  return ordered;
+}
+
+static llvm::json::Array serializeEdges(DFG &dfg) {
+  llvm::json::Array edgesArray;
+  unsigned edgeIdx = 0;
+  for (auto &srcEdge : getOrderedEdges(dfg))
+    edgesArray.push_back(
+        serializeMemrefEdge(dfg, srcEdge.first, srcEdge.second, edgeIdx++));
   return edgesArray;
 }
 
@@ -4252,6 +4272,7 @@ static ArrayRef<const char *> getPreferredJSONKeyOrder() {
       "dst",
       "value",
       "type",
+      "latency",
       "has_affine_accesses",
       "dims",
       "tensor_dim",
@@ -4490,6 +4511,27 @@ bool DFG::applyTransformSolutionFromJSON(std::string solutionPath) {
       assert(loopObj && "each loop must be a JSON object");
       unsigned factor = (unsigned)*loopObj->getInteger("tiling_factor");
       node.tilingFactors[permMap[loopPair.index()]] = factor;
+    }
+  }
+
+  // Tag each inter-node buffer's defining op with its configured storage
+  // latency so EmitVivadoHLS emits a matching bind_storage pragma. Edge order
+  // matches serializeEdges(), so a solution edge "id" indexes the same buffer.
+  if (auto* edgesArr = jsonObj->getArray("edges")) {
+    auto orderedEdges = getOrderedEdges(*this);
+    for (auto& edgeVal : *edgesArr) {
+      auto* edgeObj = edgeVal.getAsObject();
+      assert(edgeObj && "each edge must be a JSON object");
+      auto latencyOpt = edgeObj->getInteger("latency");
+      if (!latencyOpt)
+        continue;
+      unsigned eid = (unsigned)*edgeObj->getInteger("id");
+      assert(eid < orderedEdges.size() && "solution edge id out of range");
+      Value buffer = orderedEdges[eid].second.value;
+      if (Operation* defOp = buffer.getDefiningOp()) {
+        auto b = Builder(defOp->getContext());
+        defOp->setAttr("streamhls.mem_latency", b.getI64IntegerAttr(*latencyOpt));
+      }
     }
   }
 
