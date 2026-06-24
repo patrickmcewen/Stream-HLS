@@ -2066,15 +2066,35 @@ void ModuleEmitter::emitLoopDirectives(Operation *loop) {
 //   }
 // }
 
+// Determine whether a buffer is ever written, following it through function
+// calls: a dataflow producer/consumer buffer is allocated in the parent and
+// passed to a node function that performs the store, so the store is not a
+// direct user at the alloc's scope. visited guards against call cycles.
+static bool isWritten(Value memref, SmallPtrSetImpl<Operation *> &visited) {
+  for (Operation *user : memref.getUsers()) {
+    if (isa<AffineStoreOp, memref::StoreOp>(user))
+      return true;
+    if (auto call = dyn_cast<func::CallOp>(user)) {
+      auto callee = SymbolTable::lookupNearestSymbolFrom<func::FuncOp>(
+          call, call.getCalleeAttr());
+      if (!callee || !visited.insert(call).second)
+        continue;
+      for (unsigned i = 0, e = call.getNumOperands(); i < e; ++i)
+        if (call.getOperand(i) == memref &&
+            isWritten(callee.getArgument(i), visited))
+          return true;
+    }
+  }
+  return false;
+}
+
 // Infer the bind_storage memory type from how the buffer is accessed: a buffer
 // that is only ever read is a ROM; one that is written is a RAM. RAM_S2P (one
 // read port, one write port) covers the producer/consumer buffers StreamHLS
 // generates; HLS adapts the schedule when more ports are needed.
 static std::string inferStorageType(Value memref) {
-  for (Operation *user : memref.getUsers())
-    if (isa<AffineStoreOp, memref::StoreOp>(user))
-      return "RAM_S2P";
-  return "ROM_1P";
+  SmallPtrSet<Operation *, 8> visited;
+  return isWritten(memref, visited) ? "RAM_S2P" : "ROM_1P";
 }
 
 void ModuleEmitter::emitArrayDirectives(Value memref) {

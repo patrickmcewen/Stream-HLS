@@ -267,7 +267,7 @@ namespace {
         }
       }
       auto reuseIdx = 0;
-      for(auto i = innerLoops.size() - 1; i >= 0; i--){
+      for(int i = (int)innerLoops.size() - 1; i >= 0; i--){  // signed: size()-1 underflows unsigned
         auto forOp = innerLoops[i];
         auto iv = forOp.getInductionVar();
         bool isUsed = false;

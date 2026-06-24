@@ -4036,10 +4036,16 @@ static int64_t getRecurrenceLatency(AffineForOp nest, Value loadRes,
 //                           the loop-carried store; placing one innermost is
 //                           exactly the condition getForLoopII checks for II = L.
 // A node with no loop-carried store (no reduction) yields L = 1 and an empty set.
+//   accumulator          -- the loop-carried memref (the read-modify-write
+//                           buffer); null when the node has no reduction. The
+//                           differentiable II reads this buffer's storage latency
+//                           (N_acc) into the recurrence latency.
 static void computeNodeIIInfo(AffineForOp forOp, int64_t &reductionLatency,
-                              SmallVectorImpl<unsigned> &reductionLoops) {
+                              SmallVectorImpl<unsigned> &reductionLoops,
+                              Value &accumulator) {
   reductionLatency = 1;
   reductionLoops.clear();
+  accumulator = Value();
   AffineLoopBand band;
   getLoopBandFromOutermost(forOp, band);  // original (outermost-first) order
   SmallVector<AffineStoreOp> storeOps;
@@ -4057,6 +4063,7 @@ static void computeNodeIIInfo(AffineForOp forOp, int64_t &reductionLatency,
         continue;  // not a loop-carried (read-modify-write) pair
       reductionLatency =
           getRecurrenceLatency(forOp, loadOp.getResult(), storeOp.getValueToStore());
+      accumulator = storeOp.getMemRef();
       auto storeIVs = storeOp.getMapOperands();
       reductionLoops.clear();
       for (auto p : llvm::enumerate(band)) {
@@ -4068,18 +4075,28 @@ static void computeNodeIIInfo(AffineForOp forOp, int64_t &reductionLatency,
   }
 }
 
-// Attach reduction_latency / reduction_loops (see computeNodeIIInfo) onto a
-// serialized node object so the differentiable model gets the exact per-node II
-// primitives instead of inferring them from edges with a hard-coded latency.
+static std::string valueToString(Value value);
+
+// Attach reduction_latency / reduction_loops / accumulator (see computeNodeIIInfo)
+// onto a serialized node object so the differentiable model gets the exact
+// per-node II primitives instead of inferring them from edges with a hard-coded
+// latency.
 static void addNodeIIInfo(llvm::json::Object &nodeObj, AffineForOp forOp) {
   int64_t reductionLatency;
   SmallVector<unsigned> reductionLoops;
-  computeNodeIIInfo(forOp, reductionLatency, reductionLoops);
+  Value accumulator;
+  computeNodeIIInfo(forOp, reductionLatency, reductionLoops, accumulator);
   nodeObj["reduction_latency"] = reductionLatency;
   llvm::json::Array loopsArray;
   for (unsigned idx : reductionLoops)
     loopsArray.push_back((int64_t)idx);
   nodeObj["reduction_loops"] = std::move(loopsArray);
+  // The carried memref, matched by string against this node's buffers / its
+  // edges to source N_acc. Null when the node has no reduction.
+  if (accumulator)
+    nodeObj["accumulator"] = valueToString(accumulator);
+  else
+    nodeObj["accumulator"] = nullptr;
 }
 
 static llvm::json::Object serializeDesignPoint(unsigned id,
@@ -4177,6 +4194,45 @@ getTensorDimToLoopMap(Operation *op) {
 // Table 38); 1 matches the block-RAM minimum.
 static constexpr int64_t kDefaultMemLatency = 1;
 
+// Serialize a node's internal (non-edge) buffers. node.allocOps holds exactly
+// the allocs whose producer and consumer are the same node (a cross-node alloc
+// is recorded as an edge instead, see addEdge), so the two sets are disjoint and
+// emitting these here does not double-count an edge buffer. Each entry mirrors
+// the edge schema (value/type) plus index_loops: the node-loop index that
+// indexes each tensor dim (null = broadcast, held at full extent). The
+// differentiable model derives a buffer's reuse loops as the node loops absent
+// from index_loops.
+static void addNodeBuffers(llvm::json::Object &nodeObj, DFG::Node &node) {
+  llvm::json::Array buffersArray;
+  DenseSet<Value> seen;  // node.allocOps repeats a buffer per load/store pair
+  for (auto allocOp : node.allocOps) {
+    Value buffer = allocOp.getResult();
+    if (!seen.insert(buffer).second)
+      continue;
+    Operation *access = nullptr;
+    for (Operation *user : buffer.getUsers())
+      if (isa<AffineLoadOp, AffineStoreOp>(user)) {
+        access = user;
+        break;
+      }
+    if (!access)
+      continue;  // no affine access pattern: not a modelable scratchpad
+    llvm::json::Object bufObj;
+    bufObj["value"] = valueToString(buffer);
+    bufObj["type"] = typeToString(buffer.getType());
+    llvm::json::Array idxLoops;
+    for (auto loopOpt : getTensorDimToLoopMap(access)) {
+      if (loopOpt)
+        idxLoops.push_back((int64_t)*loopOpt);
+      else
+        idxLoops.push_back(nullptr);
+    }
+    bufObj["index_loops"] = std::move(idxLoops);
+    buffersArray.push_back(std::move(bufObj));
+  }
+  nodeObj["buffers"] = std::move(buffersArray);
+}
+
 static llvm::json::Object serializeMemrefEdge(DFG &dfg, unsigned srcId,
                                               DFG::Edge edge,
                                               unsigned edgeIdx) {
@@ -4267,6 +4323,9 @@ static ArrayRef<const char *> getPreferredJSONKeyOrder() {
       "permutation",
       "reduction_latency",
       "reduction_loops",
+      "accumulator",
+      "buffers",
+      "index_loops",
       "edges",
       "src",
       "dst",
@@ -4398,6 +4457,7 @@ bool DFG::writeSolutionJSON(std::string fileName) {
     }
     auto nodeObj = serializeDesignPoint(node.id, tripCounts, permMap, tilingFactors);
     addNodeIIInfo(nodeObj, forOp);
+    addNodeBuffers(nodeObj, node);
     nodesArray.push_back(std::move(nodeObj));
   }
 
@@ -4451,6 +4511,7 @@ bool DFG::emitTransformSpaceJSON(std::string fileName, uint /*tilingLimit*/,
     }
     auto nodeObj = serializeDesignPoint(node.id, tripCounts, permMap, tilingFactors);
     addNodeIIInfo(nodeObj, forOp);
+    addNodeBuffers(nodeObj, node);
     nodesArray.push_back(std::move(nodeObj));
   }
 
@@ -4511,6 +4572,29 @@ bool DFG::applyTransformSolutionFromJSON(std::string solutionPath) {
       assert(loopObj && "each loop must be a JSON object");
       unsigned factor = (unsigned)*loopObj->getInteger("tiling_factor");
       node.tilingFactors[permMap[loopPair.index()]] = factor;
+    }
+
+    // Tag this node's internal buffers with their configured storage latency so
+    // EmitVivadoHLS emits a matching bind_storage pragma. Matched by printed
+    // value (stable across the deterministic pipeline); addNodeBuffers skips
+    // non-affine allocs, so positional indexing would misalign.
+    if (auto* buffersArr = nodeObj->getArray("buffers")) {
+      for (auto& bufVal : *buffersArr) {
+        auto* bufObj = bufVal.getAsObject();
+        assert(bufObj && "each buffer must be a JSON object");
+        auto latencyOpt = bufObj->getInteger("latency");
+        auto valueStr = bufObj->getString("value");
+        if (!latencyOpt || !valueStr)
+          continue;
+        for (auto allocOp : node.allocOps) {
+          if (*valueStr != llvm::StringRef(valueToString(allocOp.getResult())))
+            continue;
+          auto b = Builder(allocOp.getContext());
+          allocOp->setAttr("streamhls.mem_latency",
+                           b.getI64IntegerAttr(*latencyOpt));
+          break;
+        }
+      }
     }
   }
 
